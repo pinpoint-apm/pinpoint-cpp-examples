@@ -1,0 +1,40 @@
+# Wrappers that combine Homebrew header repos (@homebrew, @mysql_concpp) with
+# the corresponding -l<name> link flags. Library search paths come from
+# .bazelrc (-L/opt/homebrew/lib).
+package(default_visibility = ["//visibility:public"])
+
+# libcurl ships with the macOS SDK (no Homebrew header dep needed).
+cc_library(
+    name = "curl",
+    linkopts = ["-lcurl"],
+)
+
+cc_library(
+    name = "hiredis",
+    deps = ["@homebrew//:hiredis_hdrs"],
+    linkopts = ["-lhiredis"],
+)
+
+cc_library(
+    name = "rdkafka_cpp",
+    deps = ["@homebrew//:rdkafka_hdrs"],
+    linkopts = [
+        "-lrdkafka++",
+        "-lrdkafka",
+    ],
+)
+
+cc_library(
+    name = "mongocxx",
+    deps = ["@homebrew//:mongocxx_hdrs"],
+    linkopts = [
+        "-lmongocxx",
+        "-lbsoncxx",
+    ],
+)
+
+cc_library(
+    name = "mysql_concpp",
+    deps = ["@mysql_concpp//:mysql_concpp_hdrs"],
+    linkopts = ["-lmysqlcppconnx"],
+)

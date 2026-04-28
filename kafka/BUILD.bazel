@@ -1,0 +1,31 @@
+cc_library(
+    name = "kafka_trace_context",
+    hdrs = ["kafka_trace_context.h"],
+    includes = ["."],
+    deps = [
+        "@pinpoint-cpp//:pinpoint-cpp",
+        "//third_party:rdkafka_cpp",
+    ],
+)
+
+cc_binary(
+    name = "kafka_web_producer",
+    srcs = ["kafka_web_producer.cpp"],
+    deps = [
+        ":kafka_trace_context",
+        "//cpptrace:http_trace_context",
+        "//third_party:rdkafka_cpp",
+        "@cpp_httplib//:httplib",
+        "@pinpoint-cpp//:pinpoint-cpp",
+    ],
+)
+
+cc_binary(
+    name = "kafka_consumer",
+    srcs = ["kafka_consumer.cpp"],
+    deps = [
+        ":kafka_trace_context",
+        "//third_party:rdkafka_cpp",
+        "@pinpoint-cpp//:pinpoint-cpp",
+    ],
+)

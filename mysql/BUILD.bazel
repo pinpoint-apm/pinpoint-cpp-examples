@@ -1,0 +1,10 @@
+cc_binary(
+    name = "mysql_example",
+    srcs = ["mysql_example.cpp"],
+    deps = [
+        "//cpptrace:http_trace_context",
+        "//third_party:mysql_concpp",
+        "@cpp_httplib//:httplib",
+        "@pinpoint-cpp//:pinpoint-cpp",
+    ],
+)

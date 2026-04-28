@@ -1,0 +1,8 @@
+cc_binary(
+    name = "redis_example",
+    srcs = ["redis_example.cpp"],
+    deps = [
+        "@pinpoint-cpp//:pinpoint-cpp",
+        "//third_party:hiredis",
+    ],
+)

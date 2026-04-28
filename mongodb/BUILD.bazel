@@ -1,0 +1,8 @@
+cc_binary(
+    name = "mongo_example",
+    srcs = ["mongo_example.cpp"],
+    deps = [
+        "//third_party:mongocxx",
+        "@pinpoint-cpp//:pinpoint-cpp",
+    ],
+)

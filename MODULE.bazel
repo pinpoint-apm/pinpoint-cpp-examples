@@ -1,0 +1,82 @@
+module(name = "pinpoint_cpp_examples", version = "0.1.0")
+
+bazel_dep(name = "rules_cc",         version = "0.1.1")
+bazel_dep(name = "rules_proto",      version = "7.1.0")
+bazel_dep(name = "rules_foreign_cc", version = "0.13.0")  # for civetweb only
+bazel_dep(name = "platforms",        version = "0.0.10")
+
+# pinpoint-cpp-agent has a complete bzlmod build of its own. It isn't on BCR,
+# so we pull it directly from GitHub. The grpc-idl is a git submodule, so
+# init_submodules=True is required.
+bazel_dep(name = "pinpoint-cpp", version = "1.1.0")
+git_override(
+    module_name = "pinpoint-cpp",
+    remote = "https://github.com/pinpoint-apm/pinpoint-cpp-agent.git",
+    commit = "1aa345785a7db16a7d4bcc6b6a1329140dbca2f4",
+    init_submodules = True,
+    # Bazel 8 dropped cc_proto_library from @rules_cc; the new home is
+    # @com_google_protobuf//bazel. pinpoint's 3rd_party/BUILD still uses the
+    # old import, so rewrite it on the fly.
+    patch_cmds = [
+        "sed -i.bak 's|@rules_cc//cc:defs.bzl|@com_google_protobuf//bazel:cc_proto_library.bzl|' 3rd_party/BUILD && rm -f 3rd_party/BUILD.bak",
+    ],
+)
+
+# gRPC + protobuf are pulled in transitively by pinpoint-cpp; declaring them
+# here makes the same versions available to our gRPC example as well, so
+# pinpoint and the example share one set of gRPC libraries (no ODR clash).
+bazel_dep(name = "grpc",     version = "1.74.1", repo_name = "com_github_grpc_grpc")
+bazel_dep(name = "protobuf", version = "29.2",   repo_name = "com_google_protobuf")
+
+# cpptrace is on BCR.
+bazel_dep(name = "cpptrace", version = "1.0.4")
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+new_local_repository = use_repo_rule(
+    "@bazel_tools//tools/build_defs/repo:local.bzl",
+    "new_local_repository",
+)
+
+# Homebrew system libraries (macOS arm64). Wrapped as a Bazel repo so the
+# header search paths show up *inside* the execution root from Bazel's POV.
+new_local_repository(
+    name = "homebrew",
+    path = "/opt/homebrew",
+    build_file = "//third_party:homebrew.BUILD",
+)
+
+new_local_repository(
+    name = "mysql_concpp",
+    path = "/opt/homebrew/opt/mysql-connector-c++",
+    build_file = "//third_party:mysql_concpp.BUILD",
+)
+
+# cpp-httplib (header-only).
+http_archive(
+    name = "cpp_httplib",
+    urls = ["https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.23.1.tar.gz"],
+    strip_prefix = "cpp-httplib-0.23.1",
+    build_file_content = """
+cc_library(
+    name = "httplib",
+    hdrs = ["httplib.h"],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+""",
+)
+
+# civetweb (C library) — no native Bazel support; built via rules_foreign_cc
+# in the root BUILD.bazel.
+http_archive(
+    name = "civetweb",
+    urls = ["https://github.com/civetweb/civetweb/archive/refs/tags/v1.16.tar.gz"],
+    strip_prefix = "civetweb-1.16",
+    build_file_content = """
+filegroup(
+    name = "all_srcs",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+""",
+)

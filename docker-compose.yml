@@ -1,0 +1,93 @@
+# Backing services for the kafka / mongodb / mysql / redis examples.
+#
+# Usage:
+#   docker compose up -d              # start all
+#   docker compose up -d redis        # start one
+#   docker compose down -v            # stop and wipe volumes
+#
+# Endpoints (matching each example's defaults):
+#   kafka     localhost:9092           topic: test-topic
+#   mongodb   localhost:27017
+#   mysql     localhost:3306 (classic) localhost:33060 (X Protocol)
+#                                      user: root / pinpoint123, db: test
+#   redis     localhost:6379
+
+services:
+    kafka:
+        image: apache/kafka:3.8.0
+        container_name: pinpoint-cpp-examples-kafka
+        ports:
+            - "9092:9092"
+        environment:
+            KAFKA_NODE_ID: 1
+            KAFKA_PROCESS_ROLES: broker,controller
+            KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+            KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+            KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+            KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+            KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+            KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+            KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+            KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+            KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+            KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+            KAFKA_NUM_PARTITIONS: 3
+            KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+        healthcheck:
+            test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+            interval: 5s
+            timeout: 5s
+            retries: 30
+
+    mongodb:
+        image: mongo:7
+        container_name: pinpoint-cpp-examples-mongodb
+        ports:
+            - "27017:27017"
+        volumes:
+            - mongodb-data:/data/db
+        healthcheck:
+            test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
+            interval: 5s
+            timeout: 5s
+            retries: 20
+
+    mysql:
+        image: mysql:8.0
+        container_name: pinpoint-cpp-examples-mysql
+        ports:
+            - "3306:3306"
+            - "33060:33060"   # X Protocol — used by the X DevAPI client
+        environment:
+            MYSQL_ROOT_PASSWORD: pinpoint123
+            MYSQL_ROOT_HOST: "%"
+            MYSQL_DATABASE: test
+            # Pre-creates the 'pinpoint' user so init.sql's GRANT statements succeed.
+            MYSQL_USER: pinpoint
+            MYSQL_PASSWORD: pinpoint123
+        volumes:
+            - mysql-data:/var/lib/mysql
+            - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+        healthcheck:
+            test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -ppinpoint123 --silent"]
+            interval: 5s
+            timeout: 5s
+            retries: 30
+
+    redis:
+        image: redis:7
+        container_name: pinpoint-cpp-examples-redis
+        ports:
+            - "6379:6379"
+        volumes:
+            - redis-data:/data
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 5s
+            timeout: 3s
+            retries: 10
+
+volumes:
+    mongodb-data:
+    mysql-data:
+    redis-data:

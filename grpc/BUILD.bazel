@@ -1,0 +1,55 @@
+load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@rules_proto//proto:defs.bzl", "proto_library")
+
+proto_library(
+    name = "testapp_proto",
+    srcs = ["testapp.proto"],
+)
+
+cc_proto_library(
+    name = "testapp_cc_proto",
+    deps = [":testapp_proto"],
+)
+
+cc_grpc_library(
+    name = "testapp_cc_grpc",
+    srcs = [":testapp_proto"],
+    grpc_only = True,
+    deps = [":testapp_cc_proto"],
+)
+
+cc_library(
+    name = "pinpoint_grpc_glue",
+    hdrs = [
+        "pinpoint_grpc_context.h",
+        "pinpoint_grpc_interceptors.h",
+    ],
+    includes = ["."],
+    deps = [
+        "@com_github_grpc_grpc//:grpc++",
+        "@pinpoint-cpp//:pinpoint-cpp",
+    ],
+)
+
+cc_binary(
+    name = "grpc_client",
+    srcs = ["grpc_client.cpp"],
+    deps = [
+        ":pinpoint_grpc_glue",
+        ":testapp_cc_grpc",
+        "@com_github_grpc_grpc//:grpc++",
+        "@pinpoint-cpp//:pinpoint-cpp",
+    ],
+)
+
+cc_binary(
+    name = "grpc_server",
+    srcs = ["grpc_server.cpp"],
+    deps = [
+        ":pinpoint_grpc_glue",
+        ":testapp_cc_grpc",
+        "@com_github_grpc_grpc//:grpc++",
+        "@com_github_grpc_grpc//:grpc++_reflection",
+        "@pinpoint-cpp//:pinpoint-cpp",
+    ],
+)

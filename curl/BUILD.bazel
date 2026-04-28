@@ -1,0 +1,10 @@
+cc_binary(
+    name = "curl_web_example",
+    srcs = ["curl_web_example.cpp"],
+    deps = [
+        "//cpptrace:http_trace_context",
+        "//third_party:curl",
+        "@cpp_httplib//:httplib",
+        "@pinpoint-cpp//:pinpoint-cpp",
+    ],
+)

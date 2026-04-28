@@ -1,0 +1,21 @@
+build --enable_bzlmod
+build --cxxopt=-std=c++17
+build --host_cxxopt=-std=c++17
+
+# rules_foreign_cc cmake() rules invoke CMake which (for pinpoint-cpp-agent and
+# its transitives) needs network access via FetchContent. Run those actions
+# locally so the sandbox doesn't block git clone.
+build --strategy=ForeignCcConfigure=local
+build --strategy=ForeignCcBuild=local
+
+# Headers for system-installed Homebrew libraries are exposed via the
+# @homebrew / @mysql_concpp local_repository targets in MODULE.bazel — Bazel
+# rejects absolute -isystem paths from copts as "outside execution root", so
+# wrapping them as a repo is the supported workaround.
+# Library search paths still need -L flags here.
+build:macos --linkopt=-L/opt/homebrew/lib
+build:macos --linkopt=-L/opt/homebrew/opt/mysql-connector-c++/lib
+# Expose /opt/homebrew read-only inside the macOS sandbox so the linker can
+# read those .dylib files at link time (and the runtime loader at exec time).
+build:macos --sandbox_add_mount_pair=/opt/homebrew
+build --enable_platform_specific_config

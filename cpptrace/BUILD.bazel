@@ -1,0 +1,25 @@
+cc_library(
+    name = "http_trace_context",
+    hdrs = ["http_trace_context.h"],
+    includes = ["."],
+    deps = [
+        "@pinpoint-cpp//:pinpoint-cpp",
+        "@cpp_httplib//:httplib",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_binary(
+    name = "cpptrace_example",
+    srcs = ["cpptrace_example.cpp"],
+    deps = [
+        ":http_trace_context",
+        "@cpptrace",
+        "@pinpoint-cpp//:pinpoint-cpp",
+        "@cpp_httplib//:httplib",
+    ],
+    # cpptrace 1.0.4 (BCR) pulls libunwind 1.8.1 which won't compile on macOS
+    # (its sources include <elf.h>, a Linux-only header). Build the example on
+    # Linux only; macOS users still have it via the CMake build.
+    target_compatible_with = ["@platforms//os:linux"],
+)

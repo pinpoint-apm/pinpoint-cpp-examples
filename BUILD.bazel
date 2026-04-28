@@ -1,0 +1,21 @@
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+
+# civetweb has no native Bazel build, so it stays on rules_foreign_cc cmake().
+cmake(
+    name = "civetweb",
+    lib_source = "@civetweb//:all_srcs",
+    cache_entries = {
+        "CIVETWEB_BUILD_TESTING":            "OFF",
+        "CIVETWEB_ENABLE_SERVER_EXECUTABLE": "OFF",
+        "CIVETWEB_ENABLE_CXX":               "OFF",
+        "CIVETWEB_ENABLE_SSL":               "OFF",
+        "CIVETWEB_INSTALL_EXECUTABLE":       "OFF",
+        "BUILD_SHARED_LIBS":                 "ON",
+        "CMAKE_BUILD_TYPE":                  "Release",
+    },
+    out_shared_libs = select({
+        "@platforms//os:macos":   ["libcivetweb.dylib"],
+        "//conditions:default":   ["libcivetweb.so"],
+    }),
+    visibility = ["//visibility:public"],
+)

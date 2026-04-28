@@ -1,0 +1,8 @@
+cc_binary(
+    name = "civetweb_example",
+    srcs = ["civetweb_example.c"],
+    deps = [
+        "//:civetweb",
+        "@pinpoint-cpp//:pinpoint-cpp",
+    ],
+)
