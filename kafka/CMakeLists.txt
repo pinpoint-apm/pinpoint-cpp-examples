@@ -34,6 +34,20 @@ if(NOT _rdkafka_target)
     FetchContent_MakeAvailable(librdkafka)
     if(TARGET rdkafka++)
         set(_rdkafka_target rdkafka++)
+        # The in-tree headers live at src-cpp/rdkafkacpp.h and src/rdkafka.h,
+        # but the canonical (installed) include path is <librdkafka/...>. Build
+        # a shim directory so the example sources stay portable across the
+        # FetchContent and system-install paths.
+        set(_rdkafka_shim "${librdkafka_BINARY_DIR}/include-shim")
+        file(MAKE_DIRECTORY "${_rdkafka_shim}/librdkafka")
+        file(COPY
+            "${librdkafka_SOURCE_DIR}/src-cpp/rdkafkacpp.h"
+            "${librdkafka_SOURCE_DIR}/src/rdkafka.h"
+            DESTINATION "${_rdkafka_shim}/librdkafka")
+        target_include_directories(rdkafka++ INTERFACE "$<BUILD_INTERFACE:${_rdkafka_shim}>")
+        if(TARGET rdkafka)
+            target_include_directories(rdkafka INTERFACE "$<BUILD_INTERFACE:${_rdkafka_shim}>")
+        endif()
     endif()
 endif()
 

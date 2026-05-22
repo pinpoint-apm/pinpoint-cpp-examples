@@ -37,6 +37,11 @@ set(USE_CCACHE        OFF CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS ON  CACHE BOOL "" FORCE)
 set(BUILD_STATIC_LIBS OFF CACHE BOOL "" FORCE)
 
+# yaml-cpp (fetched transitively via pinpoint_cpp) defaults to creating a
+# `format` custom target when clang-format is on PATH. That collides with the
+# `format` target that mongo-cxx-driver creates later in the configure step.
+set(YAML_CPP_FORMAT_SOURCE OFF CACHE BOOL "" FORCE)
+
 FetchContent_Declare(
     pinpoint_cpp
     GIT_REPOSITORY https://github.com/pinpoint-apm/pinpoint-cpp-agent.git

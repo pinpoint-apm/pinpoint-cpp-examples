@@ -11,6 +11,9 @@ if(NOT mongocxx_FOUND OR NOT bsoncxx_FOUND)
     set(BUILD_TESTING             OFF CACHE BOOL "" FORCE)
     set(ENABLE_EXAMPLES           OFF CACHE BOOL "" FORCE)
     set(MONGOCXX_OVERRIDE_DEFAULT_INSTALL_PREFIX OFF CACHE BOOL "" FORCE)
+    # yaml-cpp (pulled in via pinpoint_cpp) already defines an `uninstall`
+    # target; suppress mongo-cxx-driver's duplicate to avoid the collision.
+    set(ENABLE_UNINSTALL          OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(
         mongo_cxx_driver
         GIT_REPOSITORY https://github.com/mongodb/mongo-cxx-driver.git
