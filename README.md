@@ -34,23 +34,20 @@ On a Linux distro, install the equivalent packages with your package manager (`l
 
 ### Pinpoint Collector
 
-Each example sends trace data to the collector at `127.0.0.1:9991/9992/9993` by default, or to whatever the YAML file pointed to by `PINPOINT_CPP_CONFIG_FILE` specifies. The examples still run if no collector is reachable — the trace exports just fail silently.
+Each example sets its own `ApplicationName` in source via `setenv(...)`. The collector host is read from the `PINPOINT_CPP_GRPC_HOST` env var (ports default to `9991`/`9992`/`9993`). The examples still run if no collector is reachable — the trace exports just fail silently — but the agent does require a host to resolve at startup, so set the env var before launching the binary:
 
-Sample YAML (`/tmp/pinpoint-config.yaml`):
-
-```yaml
-ApplicationName: my-app
-AgentId: my-agent
-Collector:
-  Ip: 127.0.0.1
-  GrpcPort: 9991
-  StatPort: 9992
-  SpanPort: 9993
+```bash
+export PINPOINT_CPP_GRPC_HOST=collector.your.network    # or `localhost` for a local collector
+./build/debug/bin/redis_example
 ```
+
+`scripts/_lib.sh` sets `PINPOINT_CPP_GRPC_HOST=localhost` by default for the `scripts/run_*.sh` helpers — export your own value before invoking them if you have a real collector elsewhere.
 
 ### Backing services (kafka / mongodb / mysql / redis)
 
-`docker-compose.yml` defines the four services:
+The per-example scripts under `scripts/` create the necessary container on demand via `docker run` (idempotent: reused if already running). You only need to start a container manually when running a binary outside of the scripts.
+
+`docker-compose.yml` is retained as an alternative for spinning up all four services at once:
 
 ```bash
 docker compose up -d                  # start all four
@@ -66,6 +63,27 @@ Endpoints:
 
 ## Build
 
+### Per-example scripts (recommended)
+
+Each example has a `scripts/run_<name>.sh` that handles configure, build, optional `docker run` for its backing service, and a curl-driven smoke test:
+
+```bash
+./scripts/run_civetweb.sh
+./scripts/run_cpptrace.sh
+./scripts/run_curl.sh
+./scripts/run_grpc.sh
+./scripts/run_kafka.sh         # also brings up the kafka container
+./scripts/run_mongodb.sh       # also brings up the mongodb container
+./scripts/run_mysql.sh         # also brings up the mysql container
+./scripts/run_redis.sh         # also brings up the redis container
+```
+
+Containers are left running after the script exits (idempotent re-use on the next run). Stop them with `docker rm -f <name>` when you are done. Override the collector or preset via env:
+
+```bash
+PINPOINT_CPP_GRPC_HOST=10.0.0.5 PRESET=release ./scripts/run_grpc.sh
+```
+
 ### CMake
 
 ```bash
@@ -73,13 +91,14 @@ cmake --preset debug                  # or --preset release
 cmake --build build/debug
 ```
 
-Binaries land in `build/debug/bin/`. The first build takes ~5–10 minutes because pinpoint-cpp-agent fetches and compiles gRPC; subsequent incremental builds are fast.
-
-Build a single example:
+All `BUILD_*_EXAMPLE` options default to **OFF**, so the bare configure+build produces no example binaries. Enable the ones you want and rebuild:
 
 ```bash
+cmake -B build/debug -DBUILD_REDIS_EXAMPLE=ON
 cmake --build build/debug --target redis_example
 ```
+
+Binaries land in `build/debug/bin/`. The first configure takes ~5–10 minutes because pinpoint-cpp-agent fetches and compiles gRPC; subsequent incremental builds are fast.
 
 ### Bazel
 
@@ -94,14 +113,17 @@ Binaries land at `bazel-bin/<example>/<binary>`. On macOS, `cpptrace_example` is
 
 ## civetweb — HTTP server (C wrapper API)
 
-A CivetWeb HTTP server traced with pinpoint-cpp-agent's **C API** (`pt_*`). Manually constructs the header carriers and calls `pt_agent_new_span_with_reader` / `pt_trace_http_server_request` / `pt_trace_http_server_response`.
+A CivetWeb HTTP server traced with pinpoint-cpp-agent's **C API** (`pt_*`). Manually constructs the header carriers and calls `pt_agent_new_span_with_reader` / `pt_trace_http_server_request` / `pt_trace_http_server_response`. App name: `cpp-civetweb-demo`.
 
 **Build & run:**
 
 ```bash
-# CMake
+./scripts/run_civetweb.sh             # build + smoke test
+
+# Manual CMake
+cmake -B build/debug -DBUILD_CIVETWEB_EXAMPLE=ON
 cmake --build build/debug --target civetweb_example
-./build/debug/bin/civetweb_example [pinpoint-config.yaml]
+./build/debug/bin/civetweb_example
 
 # Bazel
 bazel run //civetweb:civetweb_example
@@ -125,21 +147,16 @@ Press Enter on the server console to stop the server.
 
 ## cpptrace — call-stack capture + cpp-httplib
 
-A cpp-httplib server that attaches a cpptrace-captured call stack to a Pinpoint span via `SetError`. Outgoing HTTP requests carry the trace context injected into the request headers.
+A cpp-httplib server that attaches a cpptrace-captured call stack to a Pinpoint span via `SetError`. Outgoing HTTP requests carry the trace context injected into the request headers. App name: `cpp-cpptrace-demo`.
 
 **Build & run:**
 
 ```bash
-# CMake (Bazel disabled on macOS — libunwind incompatibility)
+./scripts/run_cpptrace.sh             # build + smoke test
+
+# Manual CMake (Bazel disabled on macOS — libunwind incompatibility)
+cmake -B build/debug -DBUILD_CPPTRACE_EXAMPLE=ON
 cmake --build build/debug --target cpptrace_example
-./build/debug/bin/cpptrace_example
-```
-
-Configuration is provided via env vars (defaults to `/tmp/pinpoint-config.yaml`):
-
-```bash
-PINPOINT_CPP_CONFIG_FILE=/path/to/config.yaml \
-PINPOINT_CPP_APPLICATION_NAME=my-cpptrace-demo \
 ./build/debug/bin/cpptrace_example
 ```
 
@@ -158,12 +175,15 @@ curl 'http://localhost:8088/outgoing?host=localhost:9000&path=/bar'   # fails ->
 
 ## curl — libcurl client + trace context propagation
 
-Issues outbound HTTP requests with libcurl while injecting the Pinpoint trace context into the request headers via `curl_slist_append`.
+Issues outbound HTTP requests with libcurl while injecting the Pinpoint trace context into the request headers via `curl_slist_append`. App name: `cpp-curl-demo`.
 
 **Build & run:**
 
 ```bash
-# CMake
+./scripts/run_curl.sh                 # build + smoke test
+
+# Manual CMake
+cmake -B build/debug -DBUILD_CURL_EXAMPLE=ON
 cmake --build build/debug --target curl_web_example
 ./build/debug/bin/curl_web_example
 
@@ -190,12 +210,15 @@ curl 'http://localhost:8091/run_request?url=https://httpbin.org/get'
 
 ## grpc — gRPC client/server with interceptors
 
-Custom `ClientInterceptor` / `ServerInterceptor` inject and extract the Pinpoint trace context through gRPC metadata. All four RPC patterns (Unary, Server-Streaming, Client-Streaming, Bidi) are traced.
+Custom `ClientInterceptor` / `ServerInterceptor` inject and extract the Pinpoint trace context through gRPC metadata. All four RPC patterns (Unary, Server-Streaming, Client-Streaming, Bidi) are traced. App names: `grpc-server-demo`, `grpc-client-demo`.
 
 **Build & run:**
 
 ```bash
-# CMake
+./scripts/run_grpc.sh                 # starts the server, runs the client, tears down
+
+# Manual CMake
+cmake -B build/debug -DBUILD_GRPC_EXAMPLE=ON
 cmake --build build/debug --target grpc_server grpc_client
 
 # Terminal 1
@@ -216,14 +239,20 @@ bazel run //grpc:grpc_client
 
 ## kafka — librdkafka producer/consumer + header-based trace propagation
 
-The producer publishes a message with the trace context injected into Kafka message headers; the consumer extracts it and starts a new span as a child of the producer's trace.
+The producer publishes a message with the trace context injected into Kafka message headers; the consumer extracts it and starts a new span as a child of the producer's trace. App names: `cpp-kafka-producer-demo`, `cpp-kafka-consumer-demo`.
 
 **Build & run:**
 
 ```bash
-docker compose up -d kafka
+./scripts/run_kafka.sh                # brings up kafka, runs both binaries, verifies the message
 
-# CMake
+# Manual
+docker run -d --name pinpoint-cpp-examples-kafka -p 9092:9092 \
+    -e KAFKA_NODE_ID=1 -e KAFKA_PROCESS_ROLES=broker,controller \
+    -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 \
+    apache/kafka:3.8.0                # see scripts/run_kafka.sh for the full flag set
+
+cmake -B build/debug -DBUILD_KAFKA_EXAMPLE=ON
 cmake --build build/debug --target kafka_web_producer kafka_consumer
 
 # Terminal 1: start the consumer first (subscribes to test-topic)
@@ -252,14 +281,17 @@ curl 'http://localhost:8090/run_producer?message=hello-pinpoint'
 
 ## mongodb — mongocxx with traced CRUD
 
-Each MongoDB operation is wrapped in a SpanEvent that records the collection name and a query description as annotations.
+Each MongoDB operation is wrapped in a SpanEvent that records the collection name and a query description as annotations. App name: `cpp-mongodb-demo`.
 
 **Build & run:**
 
 ```bash
-docker compose up -d mongodb
+./scripts/run_mongodb.sh              # brings up mongo, runs the example
 
-# CMake
+# Manual
+docker run -d --name pinpoint-cpp-examples-mongodb -p 27017:27017 mongo:7
+
+cmake -B build/debug -DBUILD_MONGODB_EXAMPLE=ON
 cmake --build build/debug --target mongo_example
 ./build/debug/bin/mongo_example
 
@@ -275,14 +307,20 @@ This example runs in batch mode (it is not a server): in db `testdb` / collectio
 
 ## mysql — MySQL Connector/C++ X DevAPI + cpp-httplib
 
-Uses X Protocol (`mysqlx://`, port 33060) for SQL execution; each query is wrapped in a span event. Hitting `/db-demo` runs a SELECT/INSERT/UPDATE/DELETE/transaction sequence.
+Uses X Protocol (`mysqlx://`, port 33060) for SQL execution; each query is wrapped in a span event. Hitting `/db-demo` runs a SELECT/INSERT/UPDATE/DELETE/transaction sequence. App name: `cpp-db-demo`.
 
 **Build & run:**
 
 ```bash
-docker compose up -d mysql
+./scripts/run_mysql.sh                # brings up mysql, runs the example + smoke test
 
-# CMake
+# Manual
+docker run -d --name pinpoint-cpp-examples-mysql -p 3306:3306 -p 33060:33060 \
+    -e MYSQL_ROOT_PASSWORD=pinpoint123 -e MYSQL_DATABASE=test \
+    -v "$PWD/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro" \
+    mysql:8.0                         # see scripts/run_mysql.sh for the full flag set
+
+cmake -B build/debug -DBUILD_MYSQL_EXAMPLE=ON
 cmake --build build/debug --target mysql_example
 ./build/debug/bin/mysql_example
 
@@ -309,14 +347,17 @@ The initial schema and seed data come from [`mysql/init.sql`](mysql/init.sql), a
 
 ## redis — hiredis command tracing
 
-Each Redis command is wrapped in a SpanEvent with `SERVICE_TYPE_REDIS`.
+Each Redis command is wrapped in a SpanEvent with `SERVICE_TYPE_REDIS`. App name: `cpp-redis-demo`.
 
 **Build & run:**
 
 ```bash
-docker compose up -d redis
+./scripts/run_redis.sh                # brings up redis, runs the example
 
-# CMake
+# Manual
+docker run -d --name pinpoint-cpp-examples-redis -p 6379:6379 redis:7
+
+cmake -B build/debug -DBUILD_REDIS_EXAMPLE=ON
 cmake --build build/debug --target redis_example
 ./build/debug/bin/redis_example
 
@@ -335,5 +376,6 @@ This example is also batch-mode: PING → SET → GET → INCR → LPUSH (loop) 
 - **The first CMake build is very slow** — pinpoint-cpp-agent uses `FetchContent` to pull and compile gRPC + protobuf + abseil + BoringSSL. It's cached after the first run.
 - **`bazel: command not found`** — `brew install bazelisk`. The wrapper reads `.bazelversion` and downloads Bazel 8 automatically.
 - **`cpptrace_example` won't build under Bazel on macOS** — cpptrace BCR 1.0.4 forces libunwind, which doesn't compile on macOS. Use the CMake build for this example.
-- **MongoDB / MySQL / Kafka connection refused** — verify the service is running (`docker compose ps` shows `Up (healthy)`).
-- **Pinpoint traces don't show up in the collector** — confirm the collector is running, and that the IP/port in `PINPOINT_CPP_CONFIG_FILE` (or `pinpoint::SetConfigString`) match.
+- **MongoDB / MySQL / Kafka connection refused** — verify the container is running (`docker ps` should show `pinpoint-cpp-examples-<service>`).
+- **Pinpoint traces don't show up in the collector** — confirm the collector is reachable from this host and that `PINPOINT_CPP_GRPC_HOST` points to it. The agent's `Enable()` fails (and the example exits) if the host cannot be resolved.
+- **`cmake --build build/debug` produces no example binaries** — all `BUILD_*_EXAMPLE` options default to OFF. Use `./scripts/run_<name>.sh` or `cmake -B build/debug -DBUILD_<NAME>_EXAMPLE=ON` first.
