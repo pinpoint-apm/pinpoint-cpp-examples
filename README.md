@@ -36,7 +36,10 @@ On a Linux distro, install the equivalent packages with your package manager (`l
 
 ```bash
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+bazel clean --expunge       # required if Bazel ran previously under CLT
 ```
+
+The expunge is necessary because Bazel caches the auto-detected `@local_config_cc` / `@local_config_xcode` repos. Re-using the CLT-era cache against the new Xcode SDK paths produces `absolute path inclusion(s) found in rule ...` errors on every C++ compile.
 
 The CMake path works with Command Line Tools alone; use it if you cannot install Xcode.
 
@@ -384,6 +387,8 @@ This example is also batch-mode: PING → SET → GET → INCR → LPUSH (loop) 
 - **The first CMake build is very slow** — pinpoint-cpp-agent uses `FetchContent` to pull and compile gRPC + protobuf + abseil + BoringSSL. It's cached after the first run.
 - **`bazel: command not found`** — `brew install bazelisk`. The wrapper reads `.bazelversion` and downloads Bazel 8 automatically.
 - **`bazel build` crashes on macOS with `DottedVersion ... got 'None'`** — Bazel 8 needs a full Xcode install. Command Line Tools alone make `xcodebuild` unavailable, Bazel's auto-detected `xcode_config` records `"None"` as the SDK version, and any C++ action then crashes. Install Xcode.app and `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`, or use the CMake path instead.
+- **`absolute path inclusion(s) found in rule '@@abseil-cpp+//...'` after installing Xcode** — Bazel is still using the CLT-era `@local_config_cc` / `@local_config_xcode` caches. Run `bazel clean --expunge` once after the Xcode switch.
+- **`fatal error: 'hiredis.h' / 'bsoncxx/...' file not found` under Bazel** — the Bazel build links against Homebrew-installed system libraries. Verify `brew list hiredis librdkafka mongo-cxx-driver mysql-connector-c++` lists all four (re-run the `brew install` line in Prerequisites if any are missing).
 - **`cpptrace_example` won't build under Bazel on macOS** — cpptrace BCR 1.0.4 forces libunwind, which doesn't compile on macOS. Use the CMake build for this example.
 - **MongoDB / MySQL / Kafka connection refused** — verify the container is running (`docker ps` should show `pinpoint-cpp-examples-<service>`).
 - **Pinpoint traces don't show up in the collector** — confirm the collector is reachable from this host and that `PINPOINT_CPP_GRPC_HOST` points to it. The agent's `Enable()` fails (and the example exits) if the host cannot be resolved.
