@@ -42,14 +42,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Pinpoint Agent Init
-    pinpoint::SetConfigString(
-        "AgentId=mongodb-demo-agent\n"
-        "ApplicationName=MongoDBDemoApp\n"
-        "Collector.Ip=127.0.0.1\n"
-        "Collector.GrpcPort=9991\n"
-        "Collector.StatPort=9992\n"
-        "Collector.SpanPort=9993"
-    );
+    setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-mongodb-demo", 0);
     auto agent = pinpoint::CreateAgent();
     
     // Start a Trace

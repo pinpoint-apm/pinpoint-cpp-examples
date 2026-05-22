@@ -84,14 +84,7 @@ int main(int argc, char **argv) {
     }
 
     // Initialize Pinpoint Agent
-    pinpoint::SetConfigString(
-        "AgentId=redis-demo-agent\n"
-        "ApplicationName=RedisDemoApp\n"
-        "Collector.Ip=127.0.0.1\n"
-        "Collector.GrpcPort=9991\n"
-        "Collector.StatPort=9992\n"
-        "Collector.SpanPort=9993"
-    );
+    setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-redis-demo", 0);
     auto agent = pinpoint::CreateAgent();
 
     std::cout << "Connected to Redis at " << hostname << ":" << port << std::endl;

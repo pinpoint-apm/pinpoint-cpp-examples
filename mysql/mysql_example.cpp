@@ -535,7 +535,6 @@ void handle_db_status(const httplib::Request& req, httplib::Response& res) {
 
 int main() {
     // Pinpoint configuration
-    setenv("PINPOINT_CPP_CONFIG_FILE", "/tmp/pinpoint-config.yaml", 0);
     setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-db-demo", 0);
     setenv("PINPOINT_CPP_SQL_ENABLE_SQL_STATS", "true", 0);
     setenv("PINPOINT_CPP_HTTP_COLLECT_URL_STAT", "true", 0);

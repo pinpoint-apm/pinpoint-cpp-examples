@@ -125,14 +125,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Pinpoint Agent Init
-    pinpoint::SetConfigString(
-        "AgentId=curl-web-agent\n"
-        "ApplicationName=CurlWebExampleApp\n"
-        "Collector.Ip=127.0.0.1\n"
-        "Collector.GrpcPort=9991\n"
-        "Collector.StatPort=9992\n"
-        "Collector.SpanPort=9993"
-    );
+    setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-curl-demo", 0);
     g_agent = pinpoint::CreateAgent();
 
     httplib::Server server;

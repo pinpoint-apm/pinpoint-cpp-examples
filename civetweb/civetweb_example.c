@@ -216,15 +216,14 @@ int main(int argc, char* argv[]) {
     printf("Pinpoint CivetWeb Example Server\n");
     printf("=================================\n\n");
 
-    const char* config_file = (argc > 1) ? argv[1] : "pinpoint-config.yaml";
-    pt_set_config_file_path(config_file);
+    setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-civetweb-demo", 0);
 
     g_agent = pt_create_agent();
     if (g_agent == NULL) {
         fprintf(stderr, "Warning: Failed to create Pinpoint agent. "
                         "Server will continue without tracing.\n\n");
     } else {
-        printf("Pinpoint agent created successfully (config: %s)\n\n", config_file);
+        printf("Pinpoint agent created successfully\n\n");
     }
 
     struct mg_callbacks callbacks;

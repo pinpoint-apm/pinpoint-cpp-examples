@@ -58,14 +58,16 @@ include(CppHttplib)
 # ---------------------------------------------------------------------------
 # Per-example toggles
 # ---------------------------------------------------------------------------
-option(BUILD_CIVETWEB_EXAMPLE "Build the civetweb example"  ON)
-option(BUILD_CPPTRACE_EXAMPLE "Build the cpptrace example"  ON)
-option(BUILD_CURL_EXAMPLE     "Build the libcurl example"   ON)
-option(BUILD_GRPC_EXAMPLE     "Build the gRPC example"      ON)
-option(BUILD_KAFKA_EXAMPLE    "Build the librdkafka example" ON)
-option(BUILD_MONGODB_EXAMPLE  "Build the mongocxx example"  ON)
-option(BUILD_MYSQL_EXAMPLE    "Build the MySQL example"     ON)
-option(BUILD_REDIS_EXAMPLE    "Build the hiredis example"   ON)
+# Examples are opt-in. Use the per-example scripts under scripts/ to build &
+# run one at a time, or pass -DBUILD_<NAME>_EXAMPLE=ON to cmake manually.
+option(BUILD_CIVETWEB_EXAMPLE "Build the civetweb example"  OFF)
+option(BUILD_CPPTRACE_EXAMPLE "Build the cpptrace example"  OFF)
+option(BUILD_CURL_EXAMPLE     "Build the libcurl example"   OFF)
+option(BUILD_GRPC_EXAMPLE     "Build the gRPC example"      OFF)
+option(BUILD_KAFKA_EXAMPLE    "Build the librdkafka example" OFF)
+option(BUILD_MONGODB_EXAMPLE  "Build the mongocxx example"  OFF)
+option(BUILD_MYSQL_EXAMPLE    "Build the MySQL example"     OFF)
+option(BUILD_REDIS_EXAMPLE    "Build the hiredis example"   OFF)
 
 if(BUILD_CIVETWEB_EXAMPLE)
     add_subdirectory(civetweb)

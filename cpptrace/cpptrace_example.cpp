@@ -71,7 +71,6 @@ httplib::Server::Handler wrap_handler(httplib::Server::Handler handler);
 
 int main() {
     // Pinpoint configuration
-    setenv("PINPOINT_CPP_CONFIG_FILE", "/tmp/pinpoint-config.yaml", 0);
     setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-cpptrace-demo", 0);
     setenv("PINPOINT_CPP_ENABLE_CALLSTACK_TRACE", "true", 0);
 

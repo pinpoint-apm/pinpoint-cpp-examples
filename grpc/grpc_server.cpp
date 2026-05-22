@@ -96,7 +96,6 @@ int main(int argc, char** argv) {
   (void)argv;
 
   setenv("PINPOINT_CPP_APPLICATION_NAME", "grpc-server-demo", 0);
-  setenv("PINPOINT_CPP_CONFIG_FILE", "/tmp/pinpoint-config.yaml", 0);
   setenv("PINPOINT_CPP_HTTP_COLLECT_URL_STAT", "false", 0);
 
   auto agent = pinpoint::CreateAgent();
