@@ -32,6 +32,14 @@ brew install hiredis librdkafka mongo-cxx-driver mysql-connector-c++
 
 On a Linux distro, install the equivalent packages with your package manager (`libcurl4-openssl-dev`, `libhiredis-dev`, `librdkafka-dev`, `libmongocxx-dev`, `libmysqlcppconn-dev`, etc.).
 
+**macOS — Bazel only:** The Bazel C++ rules in Bazel 8 require a full **Xcode.app** installation (Command Line Tools alone are not enough — Bazel's `xcode-locator` looks for an Xcode bundle and Bazel crashes with `DottedVersion ... got 'None'` otherwise). Install Xcode from the App Store and run:
+
+```bash
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+```
+
+The CMake path works with Command Line Tools alone; use it if you cannot install Xcode.
+
 ### Pinpoint Collector
 
 Each example sets its own `ApplicationName` in source via `setenv(...)`. The collector host is read from the `PINPOINT_CPP_GRPC_HOST` env var (ports default to `9991`/`9992`/`9993`). The examples still run if no collector is reachable — the trace exports just fail silently — but the agent does require a host to resolve at startup, so set the env var before launching the binary:
@@ -375,6 +383,7 @@ This example is also batch-mode: PING → SET → GET → INCR → LPUSH (loop) 
 
 - **The first CMake build is very slow** — pinpoint-cpp-agent uses `FetchContent` to pull and compile gRPC + protobuf + abseil + BoringSSL. It's cached after the first run.
 - **`bazel: command not found`** — `brew install bazelisk`. The wrapper reads `.bazelversion` and downloads Bazel 8 automatically.
+- **`bazel build` crashes on macOS with `DottedVersion ... got 'None'`** — Bazel 8 needs a full Xcode install. Command Line Tools alone make `xcodebuild` unavailable, Bazel's auto-detected `xcode_config` records `"None"` as the SDK version, and any C++ action then crashes. Install Xcode.app and `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`, or use the CMake path instead.
 - **`cpptrace_example` won't build under Bazel on macOS** — cpptrace BCR 1.0.4 forces libunwind, which doesn't compile on macOS. Use the CMake build for this example.
 - **MongoDB / MySQL / Kafka connection refused** — verify the container is running (`docker ps` should show `pinpoint-cpp-examples-<service>`).
 - **Pinpoint traces don't show up in the collector** — confirm the collector is reachable from this host and that `PINPOINT_CPP_GRPC_HOST` points to it. The agent's `Enable()` fails (and the example exits) if the host cannot be resolved.
