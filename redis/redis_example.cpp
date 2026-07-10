@@ -57,7 +57,7 @@ void execute_command(redisContext *c, pinpoint::SpanPtr span, const char *format
         freeReplyObject(reply);
     }
     
-    span->EndSpanEvent();
+    span_event->EndEvent();
 }
 
 int main(int argc, char **argv) {
@@ -86,6 +86,7 @@ int main(int argc, char **argv) {
     // Initialize Pinpoint Agent
     setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-redis-demo", 0);
     auto agent = pinpoint::CreateAgent();
+    agent->Start();
 
     std::cout << "Connected to Redis at " << hostname << ":" << port << std::endl;
 
@@ -130,4 +131,3 @@ int main(int argc, char **argv) {
 
     return 0;
 }
-

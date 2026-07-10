@@ -223,6 +223,7 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "Warning: Failed to create Pinpoint agent. "
                         "Server will continue without tracing.\n\n");
     } else {
+        pt_agent_start(g_agent);
         printf("Pinpoint agent created successfully\n\n");
     }
 

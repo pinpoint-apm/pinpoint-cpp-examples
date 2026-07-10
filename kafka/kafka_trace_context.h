@@ -10,7 +10,7 @@ class KafkaTraceContextReader : public pinpoint::TraceContextReader {
 public:
     explicit KafkaTraceContextReader(const RdKafka::Headers* headers) : headers_(headers) {}
 
-    std::optional<std::string> Get(std::string_view key) const override {
+    std::optional<std::string_view> Get(std::string_view key) const override {
         if (!headers_) {
             return std::nullopt;
         }
@@ -19,13 +19,15 @@ public:
         auto result = headers_->get_last(key_str);
         
         if (result.err() == RdKafka::ErrorCode::ERR_NO_ERROR) {
-            return std::string(result.value_string());
+            value_buffer_ = result.value_string();
+            return std::string_view(value_buffer_);
         }
         return std::nullopt;
     }
 
 private:
     const RdKafka::Headers* headers_;
+    mutable std::string value_buffer_;
 };
 
 class KafkaTraceContextWriter : public pinpoint::TraceContextWriter {

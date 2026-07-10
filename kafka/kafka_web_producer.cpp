@@ -32,16 +32,16 @@ ExampleDeliveryReportCb g_dr_cb;
 bool produce_message(const std::string& message_payload, pinpoint::SpanPtr span) {
     if (!g_producer) return false;
 
-    // Prepare headers for trace propagation
-    RdKafka::Headers *headers = RdKafka::Headers::create();
-    KafkaTraceContextWriter writer(headers);
-    span->InjectContext(writer);
-
     // Create Span Event for Kafka Produce
     auto se = span->NewSpanEvent("KafkaProduce");
     se->SetServiceType(pinpoint::SERVICE_TYPE_KFAKA);
     se->SetEndPoint(g_brokers);
     se->SetDestination(g_topic_str);
+
+    // Prepare headers for trace propagation from the outgoing span event.
+    RdKafka::Headers *headers = RdKafka::Headers::create();
+    KafkaTraceContextWriter writer(headers);
+    se->InjectContext(writer);
     
     // Produce
     RdKafka::ErrorCode resp = g_producer->produce(
@@ -57,14 +57,14 @@ bool produce_message(const std::string& message_payload, pinpoint::SpanPtr span)
     if (resp != RdKafka::ERR_NO_ERROR) {
         std::cerr << "% Produce failed: " << RdKafka::err2str(resp) << std::endl;
         se->SetError(RdKafka::err2str(resp));
-        span->EndSpanEvent();
+        se->EndEvent();
         delete headers;
         return false;
     } else {
         g_producer->poll(0); // trigger callbacks
     }
 
-    span->EndSpanEvent();
+    se->EndEvent();
     return true;
 }
 
@@ -110,6 +110,7 @@ int main(int argc, char **argv) {
     // Pinpoint Agent Init
     setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-kafka-producer-demo", 0);
     g_agent = pinpoint::CreateAgent();
+    g_agent->Start();
 
     // Kafka Config
     std::string errstr;

@@ -158,10 +158,10 @@ static int random_number() {
 void DatabaseDemo::traceSqlExecution(pinpoint::SpanPtr span, const std::string& sql, 
                                     const std::vector<std::string>& params, bool success, 
                                     const std::string& error) {
+    auto spanEvent = span->GetSpanEvent();
     try {
         std::string paramString = formatParameters(params);
 
-        auto spanEvent = span->GetSpanEvent();
         spanEvent->SetSqlQuery(sql, paramString);
 
         if (!success && !error.empty()) {
@@ -172,7 +172,7 @@ void DatabaseDemo::traceSqlExecution(pinpoint::SpanPtr span, const std::string& 
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(random_number()));
-    span->EndSpanEvent();
+    spanEvent->EndEvent();
 }
 
 std::string DatabaseDemo::formatParameters(const std::vector<std::string>& params) {
@@ -294,7 +294,7 @@ std::string DatabaseDemo::runDemoHandler() {
     result << "  \"operations\": [\n";
     
     auto span = get_span_context();  // Get span from thread local storage
-    span->NewSpanEvent("runDemoHandler");
+    auto spanEvent = span->NewSpanEvent("runDemoHandler");
 
     bool first = true;
     auto addOperation = [&](const std::string& op, const std::string& status, const std::string& details = "") {
@@ -392,7 +392,7 @@ std::string DatabaseDemo::runDemoHandler() {
         std::chrono::system_clock::now().time_since_epoch()).count() << "\"\n";
     result << "}";
     
-    span->EndSpanEvent();
+    spanEvent->EndEvent();
     return result.str();
 }
 
@@ -500,7 +500,7 @@ void handle_db_demo(const httplib::Request& req, httplib::Response& res) {
     res.set_content(json_response.str(), "application/json");
     
     std::cout << "Request handled: " << req.path << " -> Status: " << res.status << std::endl;
-    span->EndSpanEvent();
+    spanEvent->EndEvent();
 }
 
 void handle_db_status(const httplib::Request& req, httplib::Response& res) {
@@ -530,7 +530,7 @@ void handle_db_status(const httplib::Request& req, httplib::Response& res) {
     res.status = 200;
     
     std::cout << "Request handled: " << req.path << " -> Status info returned" << std::endl;
-    span->EndSpanEvent();
+    spanEvent->EndEvent();
 }
 
 int main() {
@@ -540,6 +540,7 @@ int main() {
     setenv("PINPOINT_CPP_HTTP_COLLECT_URL_STAT", "true", 0);
     
     auto agent = pinpoint::CreateAgent();
+    agent->Start();
     
     // Database configuration
     DatabaseConfig config;

@@ -52,7 +52,7 @@ bool perform_curl_request(const std::string& url, pinpoint::SpanPtr span, std::s
 
         // Inject Trace Context headers
         CurlTraceContextWriter writer(&headers);
-        span->InjectContext(writer);
+        se->InjectContext(writer);
         
         // Add custom headers to cURL
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -66,7 +66,7 @@ bool perform_curl_request(const std::string& url, pinpoint::SpanPtr span, std::s
         if(res != CURLE_OK) {
             std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
             se->SetError(curl_easy_strerror(res));
-            span->EndSpanEvent();
+            se->EndEvent();
             
             curl_easy_cleanup(curl);
             curl_slist_free_all(headers);
@@ -81,7 +81,7 @@ bool perform_curl_request(const std::string& url, pinpoint::SpanPtr span, std::s
         curl_slist_free_all(headers);
     }
 
-    span->EndSpanEvent();
+    se->EndEvent();
     return true;
 }
 
@@ -127,6 +127,7 @@ int main(int argc, char* argv[]) {
     // Pinpoint Agent Init
     setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-curl-demo", 0);
     g_agent = pinpoint::CreateAgent();
+    g_agent->Start();
 
     httplib::Server server;
     server.Get("/run_request", handle_run_request);

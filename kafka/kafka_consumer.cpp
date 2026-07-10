@@ -24,6 +24,7 @@ int main(int argc, char **argv) {
     // Pinpoint Agent Init
     setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-kafka-consumer-demo", 0);
     auto agent = pinpoint::CreateAgent();
+    agent->Start();
 
     std::string errstr;
     RdKafka::Conf *conf = RdKafka::Conf::create(RdKafka::Conf::CONF_GLOBAL);
@@ -88,4 +89,3 @@ int main(int argc, char **argv) {
     
     return 0;
 }
-

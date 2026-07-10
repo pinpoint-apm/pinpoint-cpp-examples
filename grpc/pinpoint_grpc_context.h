@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <cctype>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -10,6 +12,15 @@
 #include "pinpoint/tracer.h"
 
 namespace grpc_demo {
+
+namespace detail {
+inline std::string ToLower(std::string_view value) {
+  std::string result(value);
+  std::transform(result.begin(), result.end(), result.begin(),
+                 [](unsigned char character) { return std::tolower(character); });
+  return result;
+}
+}  // namespace detail
 
 // Thread-local storage for the active span within the current thread.
 inline thread_local pinpoint::SpanPtr g_current_span = nullptr;
@@ -27,16 +38,17 @@ class GrpcServerTraceContextReader final : public pinpoint::TraceContextReader {
       : context_(context) {}
   ~GrpcServerTraceContextReader() override = default;
 
-  std::optional<std::string> Get(std::string_view key) const override {
+  std::optional<std::string_view> Get(std::string_view key) const override {
     if (context_ == nullptr) {
       return std::nullopt;
     }
 
+    const auto lower_key = detail::ToLower(key);
     const auto& metadata = context_->client_metadata();
     for (const auto& entry : metadata) {
       std::string entry_key(entry.first.data(), entry.first.size());
-      if (entry_key == key) {
-        return std::string(entry.second.data(), entry.second.size());
+      if (detail::ToLower(entry_key) == lower_key) {
+        return std::string_view(entry.second.data(), entry.second.size());
       }
     }
     return std::nullopt;
@@ -57,7 +69,7 @@ class GrpcClientTraceContextWriter final : public pinpoint::TraceContextWriter {
       return;
     }
 
-    context_->AddMetadata(std::string(key), std::string(value));
+    context_->AddMetadata(detail::ToLower(key), std::string(value));
   }
 
  private:
@@ -65,5 +77,4 @@ class GrpcClientTraceContextWriter final : public pinpoint::TraceContextWriter {
 };
 
 }  // namespace grpc_demo
-
 

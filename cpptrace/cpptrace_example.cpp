@@ -75,6 +75,7 @@ int main() {
     setenv("PINPOINT_CPP_ENABLE_CALLSTACK_TRACE", "true", 0);
 
     auto agent = pinpoint::CreateAgent();
+    agent->Start();
     httplib::Server server;
     
     // Register /users/:id endpoint
@@ -191,7 +192,7 @@ void handle_outgoing(const httplib::Request& req, httplib::Response& res) {
         HttpHeaderReaderWriter header_reader_writer(headers);
         pinpoint::helper::TraceHttpClientRequest(outgoing_span_event.value(), host, target_url, header_reader_writer);
         // Inject trace context into headers
-        span->InjectContext(header_reader_writer);
+        outgoing_span_event.value()->InjectContext(header_reader_writer);
 
         // Call external URL with HTTP client
         httplib::Client cli(host);

@@ -9,18 +9,20 @@ public:
     explicit HttpHeaderReader(const httplib::Headers& header) : headers_(header) {}
     ~HttpHeaderReader() override = default;
 
-    std::optional<std::string> Get(std::string_view key) const override {
-        auto it = headers_.find(key.data());
+    std::optional<std::string_view> Get(std::string_view key) const override {
+        auto it = headers_.find(std::string(key));
         if (it == headers_.end()) {
             return std::nullopt;
         }
-        return it->second;
+        return std::string_view(it->second);
     }
 
     void ForEach(std::function<bool(std::string_view, std::string_view)> callback) const override {
-        std::for_each(headers_.begin(), headers_.end(), [callback](const auto& pair) {
-          callback(pair.first, pair.second);
-        });
+        for (const auto& pair : headers_) {
+            if (!callback(pair.first, pair.second)) {
+                break;
+            }
+        }
     }
 
 private:
@@ -32,18 +34,20 @@ public:
     explicit HttpHeaderReaderWriter(httplib::Headers& header) : headers_(header) {}
     ~HttpHeaderReaderWriter() override = default;
 
-    std::optional<std::string> Get(std::string_view key) const override {
-        auto it = headers_.find(key.data());
+    std::optional<std::string_view> Get(std::string_view key) const override {
+        auto it = headers_.find(std::string(key));
         if (it == headers_.end()) {
             return std::nullopt;
         }
-        return it->second;
+        return std::string_view(it->second);
     }
 
     void ForEach(std::function<bool(std::string_view, std::string_view)> callback) const override {
-        std::for_each(headers_.begin(), headers_.end(), [callback](const auto& pair) {
-          callback(pair.first, pair.second);
-        });
+        for (const auto& pair : headers_) {
+            if (!callback(pair.first, pair.second)) {
+                break;
+            }
+        }
     }
 
     void Set(std::string_view key, std::string_view value) override {

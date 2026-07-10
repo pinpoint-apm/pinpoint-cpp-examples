@@ -32,7 +32,7 @@ void trace_mongo_op(pinpoint::SpanPtr span, const std::string& operation_name, c
         std::cerr << "Error in " << operation_name << ": " << e.what() << std::endl;
     }
     
-    span->EndSpanEvent();
+    se->EndEvent();
 }
 
 int main(int argc, char* argv[]) {
@@ -44,6 +44,7 @@ int main(int argc, char* argv[]) {
     // Pinpoint Agent Init
     setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-mongodb-demo", 0);
     auto agent = pinpoint::CreateAgent();
+    agent->Start();
     
     // Start a Trace
     auto span = agent->NewSpan("MongoDBDemo", "/mongo-example");
@@ -125,4 +126,3 @@ int main(int argc, char* argv[]) {
     
     return 0;
 }
-

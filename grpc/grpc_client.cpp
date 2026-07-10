@@ -112,6 +112,7 @@ int main(int argc, char** argv) {
   setenv("PINPOINT_CPP_APPLICATION_NAME", "grpc-client-demo", 0);
 
   auto agent = pinpoint::CreateAgent();
+  agent->Start();
   if (!agent->Enable()) {
     std::cerr << "Failed to enable Pinpoint agent" << std::endl;
     return 1;
@@ -126,5 +127,4 @@ int main(int argc, char** argv) {
   agent->Shutdown();
   return 0;
 }
-
 
