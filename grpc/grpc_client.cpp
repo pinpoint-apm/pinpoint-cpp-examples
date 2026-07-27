@@ -112,11 +112,11 @@ int main(int argc, char** argv) {
   setenv("PINPOINT_CPP_APPLICATION_NAME", "grpc-client-demo", 0);
 
   auto agent = pinpoint::CreateAgent();
+  // Start() brings the agent up asynchronously: the collector connection and
+  // registration complete on a background thread, so Enable() only turns true
+  // once the collector has accepted the agent. Don't gate startup on it here —
+  // the demo runs regardless and spans are delivered once registration lands.
   agent->Start();
-  if (!agent->Enable()) {
-    std::cerr << "Failed to enable Pinpoint agent" << std::endl;
-    return 1;
-  }
 
   auto stub = grpc_demo::CreateStubWithInterceptor("localhost:50051");
 
