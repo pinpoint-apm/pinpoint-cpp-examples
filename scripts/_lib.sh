@@ -26,9 +26,9 @@ ensure_pinpoint_env() {
     # Point at the dev collector via env var; ports keep their built-in
     # defaults (9991/9992/9993). Caller can override either value by
     # exporting it before invoking the script.
-    : "${PINPOINT_CPP_GRPC_HOST:=localhost}"
-    export PINPOINT_CPP_GRPC_HOST
-    log "PINPOINT_CPP_GRPC_HOST=$PINPOINT_CPP_GRPC_HOST"
+    : "${PINPOINT_CPP_COLLECTOR_HOST:=localhost}"
+    export PINPOINT_CPP_COLLECTOR_HOST
+    log "PINPOINT_CPP_COLLECTOR_HOST=$PINPOINT_CPP_COLLECTOR_HOST"
 }
 
 ensure_configure() {

@@ -45,14 +45,14 @@ The CMake path works with Command Line Tools alone; use it if you cannot install
 
 ### Pinpoint Collector
 
-Each example sets its own `ApplicationName` in source via `setenv(...)`. The collector host is read from the `PINPOINT_CPP_GRPC_HOST` env var (ports default to `9991`/`9992`/`9993`). The examples still run if no collector is reachable — the trace exports just fail silently — but the agent does require a host to resolve at startup, so set the env var before launching the binary:
+Each example sets its own `ApplicationName` in source via `setenv(...)`. The collector host is read from the `PINPOINT_CPP_COLLECTOR_HOST` env var (ports default to `9991`/`9992`/`9993`). The examples still run if no collector is reachable — the trace exports just fail silently — but the agent does require a host to resolve at startup, so set the env var before launching the binary:
 
 ```bash
-export PINPOINT_CPP_GRPC_HOST=collector.your.network    # or `localhost` for a local collector
+export PINPOINT_CPP_COLLECTOR_HOST=collector.your.network    # or `localhost` for a local collector
 ./build/debug/bin/redis_example
 ```
 
-`scripts/_lib.sh` sets `PINPOINT_CPP_GRPC_HOST=localhost` by default for the `scripts/run_*.sh` helpers — export your own value before invoking them if you have a real collector elsewhere.
+`scripts/_lib.sh` sets `PINPOINT_CPP_COLLECTOR_HOST=localhost` by default for the `scripts/run_*.sh` helpers — export your own value before invoking them if you have a real collector elsewhere.
 
 ### Backing services (kafka / mongodb / mysql / redis)
 
@@ -92,7 +92,7 @@ Each example has a `scripts/run_<name>.sh` that handles configure, build, option
 Containers are left running after the script exits (idempotent re-use on the next run). Stop them with `docker rm -f <name>` when you are done. Override the collector or preset via env:
 
 ```bash
-PINPOINT_CPP_GRPC_HOST=10.0.0.5 PRESET=release ./scripts/run_grpc.sh
+PINPOINT_CPP_COLLECTOR_HOST=10.0.0.5 PRESET=release ./scripts/run_grpc.sh
 ```
 
 ### CMake
@@ -391,5 +391,5 @@ This example is also batch-mode: PING → SET → GET → INCR → LPUSH (loop) 
 - **`fatal error: 'hiredis.h' / 'bsoncxx/...' file not found` under Bazel** — the Bazel build links against Homebrew-installed system libraries. Verify `brew list hiredis librdkafka mongo-cxx-driver mysql-connector-c++` lists all four (re-run the `brew install` line in Prerequisites if any are missing).
 - **`cpptrace_example` won't build under Bazel on macOS** — cpptrace BCR 1.0.4 forces libunwind, which doesn't compile on macOS. Use the CMake build for this example.
 - **MongoDB / MySQL / Kafka connection refused** — verify the container is running (`docker ps` should show `pinpoint-cpp-examples-<service>`).
-- **Pinpoint traces don't show up in the collector** — confirm the collector is reachable from this host and that `PINPOINT_CPP_GRPC_HOST` points to it. The agent's `Enable()` fails (and the example exits) if the host cannot be resolved.
+- **Pinpoint traces don't show up in the collector** — confirm the collector is reachable from this host and that `PINPOINT_CPP_COLLECTOR_HOST` points to it. The agent's `Enable()` fails (and the example exits) if the host cannot be resolved.
 - **`cmake --build build/debug` produces no example binaries** — all `BUILD_*_EXAMPLE` options default to OFF. Use `./scripts/run_<name>.sh` or `cmake -B build/debug -DBUILD_<NAME>_EXAMPLE=ON` first.
