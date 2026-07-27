@@ -1,4 +1,5 @@
 #include <string>
+#include <string_view>
 #include <iostream>
 #include <sstream>
 #include <vector>
@@ -160,9 +161,15 @@ void DatabaseDemo::traceSqlExecution(pinpoint::SpanPtr span, const std::string& 
                                     const std::string& error) {
     auto spanEvent = span->GetSpanEvent();
     try {
-        std::string paramString = formatParameters(params);
+        // SetSqlQuery joins the bind values itself; the views only need to stay
+        // valid for the duration of the call, and `params` outlives it.
+        std::vector<pinpoint::SqlBindValue> bindArgs;
+        bindArgs.reserve(params.size());
+        for (const auto& param : params) {
+            bindArgs.emplace_back(std::string_view{param});
+        }
 
-        spanEvent->SetSqlQuery(sql, paramString);
+        spanEvent->SetSqlQuery(sql, bindArgs);
 
         if (!success && !error.empty()) {
             spanEvent->SetError("DB_ERROR", error);

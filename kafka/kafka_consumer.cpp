@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
                 span = agent->NewSpan("KafkaConsume", "kafka_consumer");
             }
             
-            span->SetServiceType(pinpoint::SERVICE_TYPE_KFAKA);
+            span->SetServiceType(pinpoint::SERVICE_TYPE_KAFKA);
             span->SetEndPoint(brokers);
             span->SetRemoteAddress(brokers);
             

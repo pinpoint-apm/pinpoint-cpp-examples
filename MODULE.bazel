@@ -12,7 +12,7 @@ bazel_dep(name = "pinpoint-cpp", version = "1.1.0")
 git_override(
     module_name = "pinpoint-cpp",
     remote = "https://github.com/pinpoint-apm/pinpoint-cpp-agent.git",
-    commit = "d01b7d4be22e5e54bfc75e9dd37b87c4ab9c8539",
+    commit = "9850105027cef9243d1c0e165e663217c1c14866",
     init_submodules = True,
     # Bazel 8 dropped cc_proto_library from @rules_cc; the new home is
     # @com_google_protobuf//bazel. pinpoint's 3rd_party/BUILD still uses the

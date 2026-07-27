@@ -23,7 +23,7 @@ void trace_mongo_op(pinpoint::SpanPtr span, const std::string& operation_name, c
     // Since we don't have those exact constants exposed in the basic header, we'll use SQL/Generic fields
     // or custom annotations if available. For now, we put collection info in description or as SQL.
     std::string full_desc = "Collection: " + collection_name + ", Query: " + query_desc;
-    se->SetSqlQuery(full_desc, ""); 
+    se->SetSqlQuery(full_desc, {});
 
     try {
         func();

@@ -34,7 +34,7 @@ bool produce_message(const std::string& message_payload, pinpoint::SpanPtr span)
 
     // Create Span Event for Kafka Produce
     auto se = span->NewSpanEvent("KafkaProduce");
-    se->SetServiceType(pinpoint::SERVICE_TYPE_KFAKA);
+    se->SetServiceType(pinpoint::SERVICE_TYPE_KAFKA);
     se->SetEndPoint(g_brokers);
     se->SetDestination(g_topic_str);
 
