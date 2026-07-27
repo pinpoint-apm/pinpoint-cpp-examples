@@ -1,3 +1,4 @@
+#include <cctype>
 #include <iostream>
 #include <string>
 #include <cstdlib>
@@ -25,6 +26,64 @@ private:
     struct curl_slist** headers_;
 };
 
+// HeaderReader adapter over a curl_slist of "Key: value" lines, so the
+// outgoing headers can be handed to the agent's HTTP client trace helpers.
+class CurlHeaderReader final : public pinpoint::HeaderReader {
+public:
+    explicit CurlHeaderReader(const struct curl_slist* headers) : headers_(headers) {}
+
+    std::optional<std::string_view> Get(std::string_view key) const override {
+        for (const struct curl_slist* item = headers_; item != nullptr; item = item->next) {
+            std::string_view line(item->data);
+            auto sep = line.find(':');
+            if (sep == std::string_view::npos) {
+                continue;
+            }
+            auto name = line.substr(0, sep);
+            // HTTP field names are case-insensitive.
+            if (name.size() == key.size() &&
+                std::equal(name.begin(), name.end(), key.begin(), [](char a, char b) {
+                    return std::tolower(static_cast<unsigned char>(a)) ==
+                           std::tolower(static_cast<unsigned char>(b));
+                })) {
+                return trim_value(line.substr(sep + 1));
+            }
+        }
+        return std::nullopt;
+    }
+
+    void ForEach(std::function<bool(std::string_view, std::string_view)> callback) const override {
+        for (const struct curl_slist* item = headers_; item != nullptr; item = item->next) {
+            std::string_view line(item->data);
+            auto sep = line.find(':');
+            if (sep == std::string_view::npos) {
+                continue;
+            }
+            if (!callback(line.substr(0, sep), trim_value(line.substr(sep + 1)))) {
+                break;
+            }
+        }
+    }
+
+private:
+    static std::string_view trim_value(std::string_view value) {
+        while (!value.empty() && value.front() == ' ') {
+            value.remove_prefix(1);
+        }
+        return value;
+    }
+
+    const struct curl_slist* headers_;
+};
+
+// Extracts "host[:port]" from a URL for the span event's endpoint/destination.
+static std::string extract_host(const std::string& url) {
+    auto start = url.find("://");
+    start = (start == std::string::npos) ? 0 : start + 3;
+    auto end = url.find('/', start);
+    return url.substr(start, end == std::string::npos ? std::string::npos : end - start);
+}
+
 // Write callback for cURL to capture response body (optional)
 size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
@@ -39,10 +98,6 @@ bool perform_curl_request(const std::string& url, pinpoint::SpanPtr span, std::s
     // Create SpanEvent for the outgoing HTTP call; the RAII guard ends it on
     // every exit path (including the early error return below).
     pinpoint::helper::ScopedSpanEvent se(span, "execute_curl", pinpoint::SERVICE_TYPE_CPP_HTTP_CLIENT);
-    se->SetDestination(url);
-    
-    // Record URL annotation
-    se->GetAnnotations()->AppendString(pinpoint::ANNOTATION_HTTP_URL, url);
 
     curl = curl_easy_init();
     if(curl) {
@@ -53,7 +108,12 @@ bool perform_curl_request(const std::string& url, pinpoint::SpanPtr span, std::s
         // Inject Trace Context headers
         CurlTraceContextWriter writer(&headers);
         se->InjectContext(writer);
-        
+
+        // Records service type, endpoint/destination, the URL annotation and
+        // the configured request headers in one call.
+        CurlHeaderReader request_reader(headers);
+        pinpoint::helper::TraceHttpClientRequest(se.value(), extract_host(url), url, request_reader);
+
         // Add custom headers to cURL
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
@@ -72,8 +132,10 @@ bool perform_curl_request(const std::string& url, pinpoint::SpanPtr span, std::s
             return false;
         }
         
-        // Record status code
-        se->GetAnnotations()->AppendInt(pinpoint::ANNOTATION_HTTP_STATUS_CODE, (int)response_code);
+        // Records the status code annotation and the configured response
+        // headers (this example does not capture response headers).
+        CurlHeaderReader response_reader(nullptr);
+        pinpoint::helper::TraceHttpClientResponse(se.value(), (int)response_code, response_reader);
 
         // Clean up
         curl_easy_cleanup(curl);
@@ -85,13 +147,12 @@ bool perform_curl_request(const std::string& url, pinpoint::SpanPtr span, std::s
 
 void handle_run_request(const httplib::Request& req, httplib::Response& res) {
     // Extract trace context from HTTP request headers
-    HttpHeaderReader reader(req.headers);
-    auto span = g_agent->NewSpan("CurlWebExample", "/run_request", reader);
-    
-    span->SetRemoteAddress(req.remote_addr);
-    span->SetEndPoint(req.get_header_value("Host"));
-    HttpHeaderReader http_reader(req.headers);
-    span->RecordHeader(pinpoint::HTTP_REQUEST, http_reader);
+    HttpHeaderReader request_reader(req.headers);
+    auto span = g_agent->NewSpan("CurlWebExample", "/run_request", request_reader);
+
+    // Records remote address (honoring forwarded headers), endpoint, proxy
+    // header annotations and the configured request headers in one call.
+    pinpoint::helper::TraceHttpServerRequest(span, req.remote_addr, req.get_header_value("Host"), request_reader);
 
     // Determine target URL
     std::string target = g_target_url;
@@ -111,9 +172,9 @@ void handle_run_request(const httplib::Request& req, httplib::Response& res) {
         span->SetError("cURL request failed");
     }
 
+    // Records status code, URL stat and the configured response headers.
     HttpHeaderReader response_reader(res.headers);
-    span->RecordHeader(pinpoint::HTTP_RESPONSE, response_reader);
-    span->SetStatusCode(res.status);
+    pinpoint::helper::TraceHttpServerResponse(span, req.matched_route, req.method, res.status, response_reader);
     span->EndSpan();
 }
 

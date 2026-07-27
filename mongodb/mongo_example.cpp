@@ -153,28 +153,25 @@ void handle_run_demo(const httplib::Request& req, httplib::Response& res) {
 }
 
 pinpoint::SpanPtr trace_request(const httplib::Request& req) {
-    HttpHeaderReader trace_context_reader(req.headers);
-    auto span = g_agent->NewSpan("MongoDBDemo", req.path, trace_context_reader);
+    HttpHeaderReader request_reader(req.headers);
+    auto span = g_agent->NewSpan("MongoDBDemo", req.path, request_reader);
 
-    span->SetRemoteAddress(req.remote_addr);
     auto end_point = req.get_header_value("Host");
     if (end_point.empty()) {
         end_point = req.local_addr + ":" + std::to_string(req.local_port);
     }
-    span->SetEndPoint(end_point);
 
-    HttpHeaderReader http_reader(req.headers);
-    span->RecordHeader(pinpoint::HTTP_REQUEST, http_reader);
+    // Records remote address (honoring forwarded headers), endpoint, proxy
+    // header annotations and the configured request headers in one call.
+    pinpoint::helper::TraceHttpServerRequest(span, req.remote_addr, end_point, request_reader);
 
     return span;
 }
 
 void trace_response(const httplib::Request& req, httplib::Response& res, pinpoint::SpanPtr span) {
+    // Records status code, URL stat and the configured response headers.
     HttpHeaderReader http_reader(res.headers);
-    span->RecordHeader(pinpoint::HTTP_RESPONSE, http_reader);
-
-    span->SetStatusCode(res.status);
-    span->SetUrlStat(req.matched_route, req.method, res.status);
+    pinpoint::helper::TraceHttpServerResponse(span, req.matched_route, req.method, res.status, http_reader);
     span->EndSpan();
 }
 

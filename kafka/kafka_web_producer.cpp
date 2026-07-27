@@ -68,13 +68,12 @@ bool produce_message(const std::string& message_payload, pinpoint::SpanPtr span)
 
 void handle_run_producer(const httplib::Request& req, httplib::Response& res) {
     // Extract trace context from HTTP request
-    HttpHeaderReader reader(req.headers);
-    auto span = g_agent->NewSpan("KafkaWebProducer", "/run_producer", reader);
-    
-    span->SetRemoteAddress(req.remote_addr);
-    span->SetEndPoint(req.get_header_value("Host"));
-    HttpHeaderReader http_reader(req.headers);
-    span->RecordHeader(pinpoint::HTTP_REQUEST, http_reader);
+    HttpHeaderReader request_reader(req.headers);
+    auto span = g_agent->NewSpan("KafkaWebProducer", "/run_producer", request_reader);
+
+    // Records remote address (honoring forwarded headers), endpoint, proxy
+    // header annotations and the configured request headers in one call.
+    pinpoint::helper::TraceHttpServerRequest(span, req.remote_addr, req.get_header_value("Host"), request_reader);
 
     // Produce message
     std::string payload = "Message from web producer " + std::to_string(std::time(nullptr));
@@ -94,9 +93,9 @@ void handle_run_producer(const httplib::Request& req, httplib::Response& res) {
         span->SetError("Kafka production failed");
     }
 
+    // Records status code, URL stat and the configured response headers.
     HttpHeaderReader response_reader(res.headers);
-    span->RecordHeader(pinpoint::HTTP_RESPONSE, response_reader);
-    span->SetStatusCode(res.status);
+    pinpoint::helper::TraceHttpServerResponse(span, req.matched_route, req.method, res.status, response_reader);
     span->EndSpan();
 }
 
