@@ -20,4 +20,6 @@ wait_for_http "http://localhost:8080/api/health" 30
 curl_test "GET /api/users"  "http://localhost:8080/api/users"
 curl_test "GET /api/health" "http://localhost:8080/api/health"
 
+load_test "http://localhost:8080/api/users" "http://localhost:8080/api/health"
+
 log "civetweb example PASS"

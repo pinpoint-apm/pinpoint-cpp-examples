@@ -21,6 +21,32 @@ die() {
     exit 1
 }
 
+# ---------------------------------------------------------------------------
+# Options — sourcing this file leaves "$@" as the run script's arguments,
+# so they are parsed here once for every run_*.sh uniformly.
+#   --load <seconds>   after the smoke test, keep issuing requests for that
+#                      long at random 50-500ms intervals (see load_test
+#                      below); 0 disables the load test
+# ---------------------------------------------------------------------------
+RUN_LOAD_DURATION=0
+__expect_duration=0
+for __opt in "$@"; do
+    if [ "$__expect_duration" -eq 1 ]; then
+        case "$__opt" in
+            ''|*[!0-9]*) die "--load requires an integer duration in seconds, got '$__opt'" ;;
+        esac
+        RUN_LOAD_DURATION="$__opt"
+        __expect_duration=0
+        continue
+    fi
+    case "$__opt" in
+        --load) __expect_duration=1 ;;
+        *) die "unknown option '$__opt' (supported: --load <seconds>)" ;;
+    esac
+done
+[ "$__expect_duration" -eq 0 ] || die "--load requires a duration in seconds"
+unset __opt __expect_duration
+
 ensure_pinpoint_env() {
     # Examples bail out if the agent cannot resolve a collector address.
     # Point at the dev collector via env var; ports keep their built-in
@@ -113,6 +139,45 @@ curl_test() {
     fi
     if [ -n "$out" ]; then
         printf '  %s\n' "$out"
+    fi
+}
+
+load_test() {
+    # load_test <url...>
+    # No-op unless the script was invoked with --load <seconds> and the
+    # duration is > 0. Keeps issuing requests for that long, each time picking
+    # one of the given URLs at random and sleeping a random 50-500ms before
+    # the next one. Failures are counted, not fatal.
+    #
+    # Ctrl-C (SIGINT) stops the loop early: partial counts are reported and
+    # the script continues normally, so the EXIT trap still tears down the
+    # example's background servers.
+    [ "$RUN_LOAD_DURATION" -gt 0 ] || return 0
+
+    local duration_s="$RUN_LOAD_DURATION" min_ms=50 max_ms=500
+    local urls=("$@")
+    local url gap_ms ok=0 fail=0 interrupted=0
+    trap 'interrupted=1' INT
+    log "load test: ${duration_s}s of requests at random ${min_ms}-${max_ms}ms intervals (Ctrl-C to stop early)"
+    local start_s=$SECONDS
+    while [ $((SECONDS - start_s)) -lt "$duration_s" ] && [ "$interrupted" -eq 0 ]; do
+        url="${urls[RANDOM % ${#urls[@]}]}"
+        if curl -fsS -o /dev/null --max-time 10 "$url"; then
+            ok=$((ok + 1))
+        elif [ "$interrupted" -eq 0 ]; then
+            # (a curl killed by Ctrl-C is not a real request failure)
+            fail=$((fail + 1))
+            log "  request failed: $url"
+        fi
+        gap_ms=$((RANDOM % (max_ms - min_ms + 1) + min_ms))
+        # `|| true`: an interrupted sleep exits 130, which must not trip -e.
+        sleep "$(printf '%d.%03d' $((gap_ms / 1000)) $((gap_ms % 1000)))" || true
+    done
+    trap - INT
+    if [ "$interrupted" -eq 1 ]; then
+        log "load test interrupted: $ok ok, $fail failed after $((SECONDS - start_s))s"
+    else
+        log "load test done: $ok ok, $fail failed over ${duration_s}s"
     fi
 }
 

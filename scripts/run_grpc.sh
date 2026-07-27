@@ -23,4 +23,6 @@ wait_for_port localhost 8094 30
 curl_test "GET /run_client (unary/server-streaming/bidi)" \
     "http://localhost:8094/run_client"
 
+load_test "http://localhost:8094/run_client"
+
 log "grpc example PASS"

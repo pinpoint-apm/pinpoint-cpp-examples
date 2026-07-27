@@ -23,4 +23,6 @@ wait_for_port localhost 8093 30
 curl_test "GET /run_demo (PING/SET/GET/INCR/LPUSH/LRANGE)" \
     "http://localhost:8093/run_demo"
 
+load_test "http://localhost:8093/run_demo"
+
 log "redis example PASS"

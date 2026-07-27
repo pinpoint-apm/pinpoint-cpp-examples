@@ -23,4 +23,6 @@ wait_for_port localhost 8092 30
 curl_test "GET /run_demo (insert/find/update/delete)" \
     "http://localhost:8092/run_demo"
 
+load_test "http://localhost:8092/run_demo"
+
 log "mongodb example PASS"

@@ -95,6 +95,12 @@ Containers are left running after the script exits (idempotent re-use on the nex
 PINPOINT_CPP_COLLECTOR_HOST=10.0.0.5 PRESET=release ./scripts/run_grpc.sh
 ```
 
+**Load mode:** pass `--load <seconds>` to keep hitting the example's endpoints for that long after the smoke test — useful for producing a steady stream of traces to watch in the Pinpoint UI. Requests fire with a random 50–500ms gap; failures are counted and reported but don't abort the run. `--load 0` disables it, and Ctrl-C stops the load early (partial counts are reported and the servers are still torn down cleanly):
+
+```bash
+./scripts/run_redis.sh --load 60
+```
+
 ### CMake
 
 ```bash

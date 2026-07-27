@@ -23,4 +23,6 @@ log "test: GET /outgoing (expected to surface a traced failure)"
 curl -sS --max-time 10 -o /dev/null -w "  http=%{http_code}\n" \
     "http://localhost:8088/outgoing?host=localhost:9000&path=/bar" || true
 
+load_test "http://localhost:8088/users/123?name=foo"
+
 log "cpptrace example PASS"

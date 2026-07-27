@@ -22,4 +22,6 @@ TARGET_URL="${TARGET_URL:-https://httpbin.org/get}"
 curl_test "GET /run_request?url=$TARGET_URL" \
     "http://localhost:8091/run_request?url=$TARGET_URL"
 
+load_test "http://localhost:8091/run_request?url=$TARGET_URL"
+
 log "curl example PASS"

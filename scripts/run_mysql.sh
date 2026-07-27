@@ -30,4 +30,6 @@ wait_for_http "http://localhost:8089/status" 60
 curl_test "GET /status"  "http://localhost:8089/status"
 curl_test "GET /db-demo" "http://localhost:8089/db-demo"
 
+load_test "http://localhost:8089/db-demo" "http://localhost:8089/status"
+
 log "mysql example PASS"

@@ -53,6 +53,7 @@ curl_test "produce '$MESSAGE'" \
 for _ in $(seq 1 20); do
     if grep -q "$MESSAGE" "$CONSUMER_LOG"; then
         log "consumer received '$MESSAGE'"
+        load_test "http://localhost:8090/run_producer?message=load-test-$$"
         log "kafka example PASS"
         exit 0
     fi
