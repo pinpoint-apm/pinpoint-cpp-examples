@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <cstdlib>
 
@@ -8,7 +9,21 @@
 #include <mongocxx/instance.hpp>
 #include <mongocxx/uri.hpp>
 
+// HTTP Server headers
+#include "httplib.h"
+#include "http_trace_context.h"
+
 #include "pinpoint/tracer.h"
+
+// Global agent and connection settings
+pinpoint::AgentPtr g_agent = nullptr;
+std::string g_mongo_uri = "mongodb://localhost:27017";
+
+// Thread local storage for span (same pattern as the mysql example)
+thread_local pinpoint::SpanPtr current_span;
+
+void set_span_context(pinpoint::SpanPtr span) { current_span = span; }
+pinpoint::SpanPtr get_span_context() { return current_span; }
 
 // Helper to trace MongoDB operations
 template <typename Func>
@@ -17,7 +32,7 @@ void trace_mongo_op(pinpoint::SpanPtr span, const std::string& operation_name, c
     pinpoint::helper::ScopedSpanEvent se(span, operation_name, pinpoint::SERVICE_TYPE_MONGODB_QUERY);
     se->SetEndPoint("localhost:27017"); // Ideally, get this from URI
     se->SetDestination("mongodb-demo");
-    
+
     // Record collection and query details
     // Pinpoint MongoDB plugin usually records collection info in specific annotations
     // Since we don't have those exact constants exposed in the basic header, we'll use SQL/Generic fields
@@ -33,29 +48,14 @@ void trace_mongo_op(pinpoint::SpanPtr span, const std::string& operation_name, c
     }
 }
 
-int main(int argc, char* argv[]) {
-    std::string mongo_uri_str = "mongodb://localhost:27017";
-    if (const char* env_uri = std::getenv("MONGO_URI")) {
-        mongo_uri_str = env_uri;
-    }
-
-    // Pinpoint Agent Init
-    setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-mongodb-demo", 0);
-    auto agent = pinpoint::CreateAgent();
-    agent->Start();
-    
-    // Start a Trace
-    auto span = agent->NewSpan("MongoDBDemo", "/mongo-example");
-    span->SetServiceType(pinpoint::SERVICE_TYPE_CPP);
-    span->SetRemoteAddress("127.0.0.1");
-    span->SetEndPoint("mongodb-demo");
-
+// Runs the Insert → Find → Update → Delete demo under the given span.
+// A mongocxx::client is created per request: it is not thread-safe, and
+// httplib may serve concurrent requests on different threads.
+bool run_mongo_demo(pinpoint::SpanPtr span, std::string& error) {
     try {
-        // MongoDB C++ Driver Init
-        mongocxx::instance instance{}; 
-        mongocxx::uri uri(mongo_uri_str);
+        mongocxx::uri uri(g_mongo_uri);
         mongocxx::client client(uri);
-        
+
         auto db = client["testdb"];
         auto collection = db["testcollection"];
 
@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
         trace_mongo_op(span, "Find", "testcollection", "Find {name: 'MongoDB'}", [&]() {
             bsoncxx::builder::stream::document filter_builder{};
             filter_builder << "name" << "MongoDB";
-            
+
             auto cursor = collection.find(filter_builder.view());
             for (auto&& doc : cursor) {
                 std::cout << "Found document: " << bsoncxx::to_json(doc) << std::endl;
@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
                  std::cout << "Matched " << result->matched_count() << " documents, modified " << result->modified_count() << std::endl;
             }
         });
-        
+
         // 4. Delete
         trace_mongo_op(span, "Delete", "testcollection", "Delete {name: 'MongoDB'}", [&]() {
             bsoncxx::builder::stream::document filter_builder{};
@@ -114,13 +114,110 @@ int main(int argc, char* argv[]) {
             }
         });
 
+        return true;
     } catch (const std::exception& e) {
+        error = e.what();
         std::cerr << "Exception: " << e.what() << std::endl;
-        span->SetError(e.what());
+        return false;
+    }
+}
+
+// HTTP handler: runs the CRUD demo and reports the outcome as JSON.
+void handle_run_demo(const httplib::Request& req, httplib::Response& res) {
+    auto span = get_span_context();  // Get span from thread local storage
+    // RAII guard: the span event ends when `spanEvent` leaves scope.
+    pinpoint::helper::ScopedSpanEvent spanEvent(span, "handle_run_demo");
+
+    std::string error;
+    bool success = run_mongo_demo(span, error);
+
+    std::stringstream json_response;
+    if (success) {
+        json_response << "{\n";
+        json_response << "  \"success\": true,\n";
+        json_response << "  \"uri\": \"" << g_mongo_uri << "\",\n";
+        json_response << "  \"operations\": [\"Insert\", \"Find\", \"Update\", \"Delete\"]\n";
+        json_response << "}";
+        res.status = 200;
+    } else {
+        json_response << "{\n";
+        json_response << "  \"success\": false,\n";
+        json_response << "  \"error\": \"" << error << "\"\n";
+        json_response << "}";
+        res.status = 503;
+        spanEvent->SetError(error);
     }
 
+    res.set_content(json_response.str(), "application/json");
+    std::cout << "Request handled: " << req.path << " -> Status: " << res.status << std::endl;
+}
+
+pinpoint::SpanPtr trace_request(const httplib::Request& req) {
+    HttpHeaderReader trace_context_reader(req.headers);
+    auto span = g_agent->NewSpan("MongoDBDemo", req.path, trace_context_reader);
+
+    span->SetRemoteAddress(req.remote_addr);
+    auto end_point = req.get_header_value("Host");
+    if (end_point.empty()) {
+        end_point = req.local_addr + ":" + std::to_string(req.local_port);
+    }
+    span->SetEndPoint(end_point);
+
+    HttpHeaderReader http_reader(req.headers);
+    span->RecordHeader(pinpoint::HTTP_REQUEST, http_reader);
+
+    return span;
+}
+
+void trace_response(const httplib::Request& req, httplib::Response& res, pinpoint::SpanPtr span) {
+    HttpHeaderReader http_reader(res.headers);
+    span->RecordHeader(pinpoint::HTTP_RESPONSE, http_reader);
+
+    span->SetStatusCode(res.status);
+    span->SetUrlStat(req.matched_route, req.method, res.status);
     span->EndSpan();
-    agent->Shutdown();
-    
+}
+
+httplib::Server::Handler
+wrap_handler(httplib::Server::Handler handler) {
+    return [handler](const httplib::Request& req, httplib::Response& res) {
+        auto span = trace_request(req);
+        set_span_context(span);  // Store span in thread local storage
+
+        handler(req, res);
+
+        trace_response(req, res, span);
+        set_span_context(nullptr);  // Clear span from thread local storage
+    };
+}
+
+int main(int argc, char* argv[]) {
+    if (const char* env_uri = std::getenv("MONGO_URI")) {
+        g_mongo_uri = env_uri;
+    }
+
+    // Pinpoint Agent Init
+    setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-mongodb-demo", 0);
+    g_agent = pinpoint::CreateAgent();
+    g_agent->Start();
+
+    // MongoDB C++ Driver Init (must be constructed once per process and
+    // outlive every client created from it)
+    mongocxx::instance instance{};
+
+    httplib::Server server;
+    server.Get("/run_demo", wrap_handler(handle_run_demo));
+
+    std::cout << "MongoDB Demo with Pinpoint Tracing (HTTP Server)" << std::endl;
+    std::cout << "MongoDB URI: " << g_mongo_uri << std::endl;
+    std::cout << "\nHTTP Server starting on http://localhost:8092" << std::endl;
+    std::cout << "Endpoints:" << std::endl;
+    std::cout << "  GET /run_demo  - Run Insert/Find/Update/Delete demo with tracing" << std::endl;
+    std::cout << "\nTry:  curl http://localhost:8092/run_demo" << std::endl;
+    std::cout << "\nPress Ctrl+C to stop the server..." << std::endl;
+
+    server.listen("0.0.0.0", 8092);
+
+    g_agent->Shutdown();
     return 0;
 }

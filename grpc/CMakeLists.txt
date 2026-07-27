@@ -48,9 +48,13 @@ target_link_libraries(testapp_grpc_proto PUBLIC
 )
 
 add_executable(grpc_client grpc_client.cpp)
-target_include_directories(grpc_client PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(grpc_client PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/cpptrace  # shared http_trace_context.h
+)
 target_link_libraries(grpc_client PRIVATE
     pinpoint_cpp
+    httplib::httplib
     testapp_grpc_proto
 )
 

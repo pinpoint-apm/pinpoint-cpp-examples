@@ -44,8 +44,12 @@ if(NOT _mongo_target OR NOT _bson_target)
 endif()
 
 add_executable(mongo_example mongo_example.cpp)
+target_include_directories(mongo_example PRIVATE
+    ${CMAKE_SOURCE_DIR}/cpptrace  # shared http_trace_context.h
+)
 target_link_libraries(mongo_example PRIVATE
     pinpoint_cpp
+    httplib::httplib
     ${_mongo_target}
     ${_bson_target}
 )

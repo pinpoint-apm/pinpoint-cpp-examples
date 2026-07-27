@@ -1,6 +1,7 @@
 #include <chrono>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -8,6 +9,10 @@
 #include <grpcpp/grpcpp.h>
 
 #include "pinpoint/tracer.h"
+
+// HTTP Server headers
+#include "httplib.h"
+#include "http_trace_context.h"
 
 #include "pinpoint_grpc_context.h"
 #include "pinpoint_grpc_interceptors.h"
@@ -30,11 +35,11 @@ std::unique_ptr<grpcdemo::Hello::Stub> CreateStubWithInterceptor(
   return grpcdemo::Hello::NewStub(channel);
 }
 
-void CallUnary(grpcdemo::Hello::Stub* stub) {
-  auto agent = pinpoint::GlobalAgent();
-  auto span = agent->NewSpan("gRPC Client Unary", "/grpcdemo.Hello/UnaryCallUnaryReturn");
-  SetCurrentSpan(span);
+// The RPC helpers below run under the handler's span: the client interceptor
+// picks it up via GetCurrentSpan() and attaches a span event per RPC, so they
+// only perform the call and record failures on the span.
 
+bool CallUnary(grpcdemo::Hello::Stub* stub, pinpoint::SpanPtr span) {
   grpc::ClientContext context;
   grpcdemo::Greeting request;
   grpcdemo::Greeting response;
@@ -43,20 +48,13 @@ void CallUnary(grpcdemo::Hello::Stub* stub) {
   auto status = stub->UnaryCallUnaryReturn(&context, request, &response);
   if (!status.ok()) {
     span->SetError(status.error_message());
-  } else {
-    span->GetAnnotations()->AppendString(pinpoint::ANNOTATION_API, response.msg());
+    return false;
   }
-
-  span->EndSpan();
-  ClearCurrentSpan();
+  span->GetAnnotations()->AppendString(pinpoint::ANNOTATION_API, response.msg());
+  return true;
 }
 
-void CallServerStreaming(grpcdemo::Hello::Stub* stub) {
-  auto agent = pinpoint::GlobalAgent();
-  auto span = agent->NewSpan("gRPC Client ServerStream",
-                             "/grpcdemo.Hello/UnaryCallStreamReturn");
-  SetCurrentSpan(span);
-
+bool CallServerStreaming(grpcdemo::Hello::Stub* stub, pinpoint::SpanPtr span) {
   grpc::ClientContext context;
   grpcdemo::Greeting request;
   request.set_msg("Stream greetings");
@@ -69,18 +67,12 @@ void CallServerStreaming(grpcdemo::Hello::Stub* stub) {
   auto status = reader->Finish();
   if (!status.ok()) {
     span->SetError(status.error_message());
+    return false;
   }
-
-  span->EndSpan();
-  ClearCurrentSpan();
+  return true;
 }
 
-void CallBidirectional(grpcdemo::Hello::Stub* stub) {
-  auto agent = pinpoint::GlobalAgent();
-  auto span = agent->NewSpan("gRPC Client Bidi",
-                             "/grpcdemo.Hello/StreamCallStreamReturn");
-  SetCurrentSpan(span);
-
+bool CallBidirectional(grpcdemo::Hello::Stub* stub, pinpoint::SpanPtr span) {
   grpc::ClientContext context;
   auto stream = stub->StreamCallStreamReturn(&context);
 
@@ -97,34 +89,124 @@ void CallBidirectional(grpcdemo::Hello::Stub* stub) {
   auto status = stream->Finish();
   if (!status.ok()) {
     span->SetError(status.error_message());
+    return false;
   }
-
-  span->EndSpan();
-  ClearCurrentSpan();
+  return true;
 }
 
 }  // namespace grpc_demo
+
+// Global agent, stub and connection settings
+pinpoint::AgentPtr g_agent = nullptr;
+std::unique_ptr<grpcdemo::Hello::Stub> g_stub;
+std::string g_grpc_target = "localhost:50051";
+
+// HTTP handler: runs the unary → server-streaming → bidi call sequence
+// against the gRPC server and reports the outcome as JSON.
+void handle_run_client(const httplib::Request& req, httplib::Response& res) {
+  auto span = grpc_demo::GetCurrentSpan();
+  // RAII guard: the span event ends when `spanEvent` leaves scope.
+  pinpoint::helper::ScopedSpanEvent spanEvent(span, "handle_run_client");
+
+  bool unary_ok = grpc_demo::CallUnary(g_stub.get(), span);
+  bool stream_ok = grpc_demo::CallServerStreaming(g_stub.get(), span);
+  bool bidi_ok = grpc_demo::CallBidirectional(g_stub.get(), span);
+  bool success = unary_ok && stream_ok && bidi_ok;
+
+  std::stringstream json_response;
+  json_response << "{\n";
+  json_response << "  \"success\": " << (success ? "true" : "false") << ",\n";
+  json_response << "  \"target\": \"" << g_grpc_target << "\",\n";
+  json_response << "  \"calls\": {\n";
+  json_response << "    \"unary\": " << (unary_ok ? "true" : "false") << ",\n";
+  json_response << "    \"server_streaming\": " << (stream_ok ? "true" : "false") << ",\n";
+  json_response << "    \"bidirectional\": " << (bidi_ok ? "true" : "false") << "\n";
+  json_response << "  }\n";
+  json_response << "}";
+
+  res.status = success ? 200 : 502;
+  if (!success) {
+    spanEvent->SetError("one or more gRPC calls failed");
+  }
+
+  res.set_content(json_response.str(), "application/json");
+  std::cout << "Request handled: " << req.path << " -> Status: " << res.status << std::endl;
+}
+
+pinpoint::SpanPtr trace_request(const httplib::Request& req) {
+  HttpHeaderReader trace_context_reader(req.headers);
+  auto span = g_agent->NewSpan("gRPC Client Web", req.path, trace_context_reader);
+
+  span->SetRemoteAddress(req.remote_addr);
+  auto end_point = req.get_header_value("Host");
+  if (end_point.empty()) {
+    end_point = req.local_addr + ":" + std::to_string(req.local_port);
+  }
+  span->SetEndPoint(end_point);
+
+  HttpHeaderReader http_reader(req.headers);
+  span->RecordHeader(pinpoint::HTTP_REQUEST, http_reader);
+
+  return span;
+}
+
+void trace_response(const httplib::Request& req, httplib::Response& res, pinpoint::SpanPtr span) {
+  HttpHeaderReader http_reader(res.headers);
+  span->RecordHeader(pinpoint::HTTP_RESPONSE, http_reader);
+
+  span->SetStatusCode(res.status);
+  span->SetUrlStat(req.matched_route, req.method, res.status);
+  span->EndSpan();
+}
+
+httplib::Server::Handler
+wrap_handler(httplib::Server::Handler handler) {
+  return [handler](const httplib::Request& req, httplib::Response& res) {
+    auto span = trace_request(req);
+    // The gRPC client interceptor locates the active span through this
+    // thread-local, so it doubles as the handler's span context.
+    grpc_demo::SetCurrentSpan(span);
+
+    handler(req, res);
+
+    trace_response(req, res, span);
+    grpc_demo::ClearCurrentSpan();
+  };
+}
 
 int main(int argc, char** argv) {
   (void)argc;
   (void)argv;
 
+  if (const char* env_target = std::getenv("GRPC_TARGET")) {
+    g_grpc_target = env_target;
+  }
+
   setenv("PINPOINT_CPP_APPLICATION_NAME", "grpc-client-demo", 0);
 
-  auto agent = pinpoint::CreateAgent();
+  g_agent = pinpoint::CreateAgent();
   // Start() brings the agent up asynchronously: the collector connection and
   // registration complete on a background thread, so Enable() only turns true
   // once the collector has accepted the agent. Don't gate startup on it here —
   // the demo runs regardless and spans are delivered once registration lands.
-  agent->Start();
+  g_agent->Start();
 
-  auto stub = grpc_demo::CreateStubWithInterceptor("localhost:50051");
+  // The channel and stub are thread-safe and shared across requests.
+  g_stub = grpc_demo::CreateStubWithInterceptor(g_grpc_target);
 
-  grpc_demo::CallUnary(stub.get());
-  grpc_demo::CallServerStreaming(stub.get());
-  grpc_demo::CallBidirectional(stub.get());
+  httplib::Server server;
+  server.Get("/run_client", wrap_handler(handle_run_client));
 
-  agent->Shutdown();
+  std::cout << "gRPC Client Demo with Pinpoint Tracing (HTTP Server)" << std::endl;
+  std::cout << "gRPC target: " << g_grpc_target << std::endl;
+  std::cout << "\nHTTP Server starting on http://localhost:8094" << std::endl;
+  std::cout << "Endpoints:" << std::endl;
+  std::cout << "  GET /run_client  - Run unary/server-streaming/bidi calls with tracing" << std::endl;
+  std::cout << "\nTry:  curl http://localhost:8094/run_client" << std::endl;
+  std::cout << "\nPress Ctrl+C to stop the server..." << std::endl;
+
+  server.listen("0.0.0.0", 8094);
+
+  g_agent->Shutdown();
   return 0;
 }
-

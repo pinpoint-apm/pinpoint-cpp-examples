@@ -45,8 +45,12 @@ if(NOT _hiredis_target)
 endif()
 
 add_executable(redis_example redis_example.cpp)
+target_include_directories(redis_example PRIVATE
+    ${CMAKE_SOURCE_DIR}/cpptrace  # shared http_trace_context.h
+)
 target_link_libraries(redis_example PRIVATE
     pinpoint_cpp
+    httplib::httplib
     ${_hiredis_target}
 )
 if(_hiredis_includes)

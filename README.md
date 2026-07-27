@@ -14,11 +14,11 @@ Two build systems are supported:
 | [civetweb/](civetweb/)   | [CivetWeb](https://github.com/civetweb/civetweb) (HTTP server, C)        | `civetweb_example`                  |
 | [cpptrace/](cpptrace/)   | [cpptrace](https://github.com/jeremy-rifkin/cpptrace) + cpp-httplib      | `cpptrace_example`                  |
 | [curl/](curl/)           | [libcurl](https://curl.se/libcurl/) + cpp-httplib                        | `curl_web_example`                  |
-| [grpc/](grpc/)           | [gRPC](https://grpc.io/)                                                  | `grpc_client`, `grpc_server`        |
+| [grpc/](grpc/)           | [gRPC](https://grpc.io/) + cpp-httplib                                    | `grpc_client`, `grpc_server`        |
 | [kafka/](kafka/)         | [librdkafka](https://github.com/confluentinc/librdkafka) + cpp-httplib   | `kafka_web_producer`, `kafka_consumer` |
-| [mongodb/](mongodb/)     | [mongo-cxx-driver](https://github.com/mongodb/mongo-cxx-driver)          | `mongo_example`                     |
+| [mongodb/](mongodb/)     | [mongo-cxx-driver](https://github.com/mongodb/mongo-cxx-driver) + cpp-httplib | `mongo_example`                |
 | [mysql/](mysql/)         | [MySQL Connector/C++ X DevAPI](https://dev.mysql.com/doc/connector-cpp/) + cpp-httplib | `mysql_example` |
-| [redis/](redis/)         | [hiredis](https://github.com/redis/hiredis)                              | `redis_example`                     |
+| [redis/](redis/)         | [hiredis](https://github.com/redis/hiredis) + cpp-httplib                | `redis_example`                     |
 
 ## Prerequisites
 
@@ -226,7 +226,7 @@ Custom `ClientInterceptor` / `ServerInterceptor` inject and extract the Pinpoint
 **Build & run:**
 
 ```bash
-./scripts/run_grpc.sh                 # starts the server, runs the client, tears down
+./scripts/run_grpc.sh                 # starts server + client, smoke-tests, tears down
 
 # Manual CMake
 cmake -B build/debug -DBUILD_GRPC_EXAMPLE=ON
@@ -234,7 +234,7 @@ cmake --build build/debug --target grpc_server grpc_client
 
 # Terminal 1
 ./build/debug/bin/grpc_server                       # listens on 0.0.0.0:50051
-# Terminal 2
+# Terminal 2: client (HTTP server on port 8094)
 ./build/debug/bin/grpc_client
 
 # Bazel (same pattern)
@@ -244,7 +244,16 @@ bazel run //grpc:grpc_client
 
 **Proto:** [`testapp.proto`](grpc/testapp.proto). Service `grpcdemo.Hello` with four methods.
 
-`grpc_client` runs unary → server-streaming → bidi calls in sequence on startup, then exits.
+The gRPC server address can be overridden via `GRPC_TARGET` (default `localhost:50051`).
+
+**Client endpoint** (`localhost:8094`):
+- `GET /run_client` — runs unary → server-streaming → bidi calls against the gRPC server, returns JSON
+
+**Test:**
+
+```bash
+curl http://localhost:8094/run_client
+```
 
 ---
 
@@ -297,7 +306,7 @@ Each MongoDB operation is wrapped in a SpanEvent that records the collection nam
 **Build & run:**
 
 ```bash
-./scripts/run_mongodb.sh              # brings up mongo, runs the example
+./scripts/run_mongodb.sh              # brings up mongo, runs the example + smoke test
 
 # Manual
 docker run -d --name pinpoint-cpp-examples-mongodb -p 27017:27017 mongo:7
@@ -312,7 +321,14 @@ bazel run //mongodb:mongo_example
 
 Override the URI via `MONGO_URI` (default `mongodb://localhost:27017`).
 
-This example runs in batch mode (it is not a server): in db `testdb` / collection `testcollection` it performs Insert → Find → Update → Delete, then exits.
+**Endpoint** (`localhost:8092`):
+- `GET /run_demo` — in db `testdb` / collection `testcollection`, performs Insert → Find → Update → Delete, returns JSON
+
+**Test:**
+
+```bash
+curl http://localhost:8092/run_demo
+```
 
 ---
 
@@ -363,7 +379,7 @@ Each Redis command is wrapped in a SpanEvent with `SERVICE_TYPE_REDIS`. App name
 **Build & run:**
 
 ```bash
-./scripts/run_redis.sh                # brings up redis, runs the example
+./scripts/run_redis.sh                # brings up redis, runs the example + smoke test
 
 # Manual
 docker run -d --name pinpoint-cpp-examples-redis -p 6379:6379 redis:7
@@ -378,7 +394,14 @@ bazel run //redis:redis_example
 
 Host / port overrides: `REDIS_HOST`, `REDIS_PORT`.
 
-This example is also batch-mode: PING → SET → GET → INCR → LPUSH (loop) → LRANGE, then exits.
+**Endpoint** (`localhost:8093`):
+- `GET /run_demo` — runs PING → SET → GET → INCR → LPUSH (loop) → LRANGE, returns JSON
+
+**Test:**
+
+```bash
+curl http://localhost:8093/run_demo
+```
 
 ---
 

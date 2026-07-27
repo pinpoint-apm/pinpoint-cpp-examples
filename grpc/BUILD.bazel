@@ -37,7 +37,9 @@ cc_binary(
     deps = [
         ":pinpoint_grpc_glue",
         ":testapp_cc_grpc",
+        "//cpptrace:http_trace_context",
         "@com_github_grpc_grpc//:grpc++",
+        "@cpp_httplib//:httplib",
         "@pinpoint-cpp//:pinpoint-cpp",
     ],
 )

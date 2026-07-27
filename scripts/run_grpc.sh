@@ -8,14 +8,19 @@ ensure_pinpoint_env
 ensure_configure BUILD_GRPC_EXAMPLE
 build_targets grpc_server grpc_client
 
-PIDFILE="$(mktemp)"
-LOGFILE="$(mktemp)"
-trap 'stop_bg "$PIDFILE"; log "server log: $LOGFILE"' EXIT
+SERVER_PIDFILE="$(mktemp)"
+SERVER_LOGFILE="$(mktemp)"
+CLIENT_PIDFILE="$(mktemp)"
+CLIENT_LOGFILE="$(mktemp)"
+trap 'stop_bg "$CLIENT_PIDFILE"; stop_bg "$SERVER_PIDFILE"; log "server log: $SERVER_LOGFILE"; log "client log: $CLIENT_LOGFILE"' EXIT
 
-start_bg "$PIDFILE" "$LOGFILE" -- "$BIN_DIR/grpc_server" </dev/null
+start_bg "$SERVER_PIDFILE" "$SERVER_LOGFILE" -- "$BIN_DIR/grpc_server" </dev/null
 wait_for_port localhost 50051 30
 
-log "running grpc_client (foreground)"
-"$BIN_DIR/grpc_client"
+start_bg "$CLIENT_PIDFILE" "$CLIENT_LOGFILE" -- "$BIN_DIR/grpc_client" </dev/null
+wait_for_port localhost 8094 30
+
+curl_test "GET /run_client (unary/server-streaming/bidi)" \
+    "http://localhost:8094/run_client"
 
 log "grpc example PASS"
