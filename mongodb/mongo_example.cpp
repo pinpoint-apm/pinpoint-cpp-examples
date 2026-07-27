@@ -13,8 +13,8 @@
 // Helper to trace MongoDB operations
 template <typename Func>
 void trace_mongo_op(pinpoint::SpanPtr span, const std::string& operation_name, const std::string& collection_name, const std::string& query_desc, Func func) {
-    auto se = span->NewSpanEvent(operation_name);
-    se->SetServiceType(pinpoint::SERVICE_TYPE_MONGODB_QUERY);
+    // RAII guard: the span event ends when `se` leaves scope, even if func() throws.
+    pinpoint::helper::ScopedSpanEvent se(span, operation_name, pinpoint::SERVICE_TYPE_MONGODB_QUERY);
     se->SetEndPoint("localhost:27017"); // Ideally, get this from URI
     se->SetDestination("mongodb-demo");
     
@@ -31,8 +31,6 @@ void trace_mongo_op(pinpoint::SpanPtr span, const std::string& operation_name, c
         se->SetError(e.what());
         std::cerr << "Error in " << operation_name << ": " << e.what() << std::endl;
     }
-    
-    se->EndEvent();
 }
 
 int main(int argc, char* argv[]) {

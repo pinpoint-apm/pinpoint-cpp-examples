@@ -81,9 +81,9 @@ private:
     std::unique_ptr<mysqlx::Session> session_;
     
     // Tracing helper methods
-    pinpoint::SpanPtr createSqlSpanEvent(const std::string& operation);
-    void traceSqlExecution(pinpoint::SpanPtr span, const std::string& sql, 
-                          const std::vector<std::string>& params, bool success, 
+    void initSqlSpanEvent(pinpoint::SpanEventPtr spanEvent);
+    void traceSqlExecution(pinpoint::SpanEventPtr spanEvent, const std::string& sql,
+                          const std::vector<std::string>& params, bool success,
                           const std::string& error = "");
     std::string formatParameters(const std::vector<std::string>& params);
     
@@ -139,14 +139,9 @@ void DatabaseDemo::disconnect() {
     }
 }
 
-pinpoint::SpanPtr DatabaseDemo::createSqlSpanEvent(const std::string& operation) {
-    auto span = get_span_context();  // Get span from thread local storage    
-    auto spanEvent = span->NewSpanEvent("SQL_" + operation);
-    spanEvent->SetServiceType(pinpoint::SERVICE_TYPE_MYSQL_QUERY);
+void DatabaseDemo::initSqlSpanEvent(pinpoint::SpanEventPtr spanEvent) {
     spanEvent->SetEndPoint(config_.host + ":" + config_.port);
     spanEvent->SetDestination(config_.database);
-    
-    return span;
 }
 
 static int random_number() {
@@ -156,10 +151,9 @@ static int random_number() {
     return dis(gen);
 }
 
-void DatabaseDemo::traceSqlExecution(pinpoint::SpanPtr span, const std::string& sql, 
-                                    const std::vector<std::string>& params, bool success, 
+void DatabaseDemo::traceSqlExecution(pinpoint::SpanEventPtr spanEvent, const std::string& sql,
+                                    const std::vector<std::string>& params, bool success,
                                     const std::string& error) {
-    auto spanEvent = span->GetSpanEvent();
     try {
         // SetSqlQuery joins the bind values itself; the views only need to stay
         // valid for the duration of the call, and `params` outlives it.
@@ -178,8 +172,9 @@ void DatabaseDemo::traceSqlExecution(pinpoint::SpanPtr span, const std::string& 
         std::cerr << "Error in SQL tracing: " << e.what() << std::endl;;
     }
 
+    // Simulated latency; the caller's ScopedSpanEvent guard ends the event
+    // after this returns, so the sleep is included in the event duration.
     std::this_thread::sleep_for(std::chrono::milliseconds(random_number()));
-    spanEvent->EndEvent();
 }
 
 std::string DatabaseDemo::formatParameters(const std::vector<std::string>& params) {
@@ -198,7 +193,10 @@ std::string DatabaseDemo::formatParameters(const std::vector<std::string>& param
 }
 
 void DatabaseDemo::executeSelectQuery(const std::string& sql, const std::vector<std::string>& params) {
-    auto span = createSqlSpanEvent("SELECT");
+    // RAII guard: the SQL span event ends when `spanEvent` leaves scope.
+    pinpoint::helper::ScopedSpanEvent spanEvent(get_span_context(), "SQL_SELECT",
+                                                pinpoint::SERVICE_TYPE_MYSQL_QUERY);
+    initSqlSpanEvent(spanEvent.value());
     bool success = false;
     std::string error;
     
@@ -243,14 +241,17 @@ void DatabaseDemo::executeSelectQuery(const std::string& sql, const std::vector<
         error = std::string("Exception: ") + e.what();
         std::cerr << "SELECT failed: " << error << std::endl;
     }
-    
-    traceSqlExecution(span, sql, params, success, error);
+
+    traceSqlExecution(spanEvent.value(), sql, params, success, error);
 }
 
 // Unified DML query execution (INSERT, UPDATE, DELETE)
 void DatabaseDemo::executeDMLQuery(QueryType type, const std::string& sql, const std::vector<std::string>& params) {
     std::string queryTypeName = queryTypeToString(type);
-    auto span = createSqlSpanEvent(queryTypeName);
+    // RAII guard: the SQL span event ends when `spanEvent` leaves scope.
+    pinpoint::helper::ScopedSpanEvent spanEvent(get_span_context(), "SQL_" + queryTypeName,
+                                                pinpoint::SERVICE_TYPE_MYSQL_QUERY);
+    initSqlSpanEvent(spanEvent.value());
     bool success = false;
     std::string error;
     
@@ -289,8 +290,8 @@ void DatabaseDemo::executeDMLQuery(QueryType type, const std::string& sql, const
         error = std::string("Exception: ") + e.what();
         std::cerr << queryTypeName << " failed: " << error << std::endl;
     }
-    
-    traceSqlExecution(span, sql, params, success, error);
+
+    traceSqlExecution(spanEvent.value(), sql, params, success, error);
 }
 
 std::string DatabaseDemo::runDemoHandler() {
@@ -301,7 +302,8 @@ std::string DatabaseDemo::runDemoHandler() {
     result << "  \"operations\": [\n";
     
     auto span = get_span_context();  // Get span from thread local storage
-    auto spanEvent = span->NewSpanEvent("runDemoHandler");
+    // RAII guard: the span event ends when `spanEvent` leaves scope.
+    pinpoint::helper::ScopedSpanEvent spanEvent(span, "runDemoHandler");
 
     bool first = true;
     auto addOperation = [&](const std::string& op, const std::string& status, const std::string& details = "") {
@@ -398,8 +400,7 @@ std::string DatabaseDemo::runDemoHandler() {
     result << "  \"timestamp\": \"" << std::chrono::duration_cast<std::chrono::seconds>(
         std::chrono::system_clock::now().time_since_epoch()).count() << "\"\n";
     result << "}";
-    
-    spanEvent->EndEvent();
+
     return result.str();
 }
 
@@ -456,8 +457,9 @@ DatabaseDemo* g_demo = nullptr;
 
 void handle_db_demo(const httplib::Request& req, httplib::Response& res) {
     auto span = get_span_context();  // Get span from thread local storage
-    auto spanEvent = span->NewSpanEvent("handle_db_demo");
-    
+    // RAII guard: the span event ends when `spanEvent` leaves scope.
+    pinpoint::helper::ScopedSpanEvent spanEvent(span, "handle_db_demo");
+
     std::stringstream json_response;
     
     try {
@@ -507,13 +509,13 @@ void handle_db_demo(const httplib::Request& req, httplib::Response& res) {
     res.set_content(json_response.str(), "application/json");
     
     std::cout << "Request handled: " << req.path << " -> Status: " << res.status << std::endl;
-    spanEvent->EndEvent();
 }
 
 void handle_db_status(const httplib::Request& req, httplib::Response& res) {
-    auto span = get_span_context();  // Get span from thread local storage  
-    auto spanEvent = span->NewSpanEvent("handle_db_status");
-    
+    auto span = get_span_context();  // Get span from thread local storage
+    // RAII guard: the span event ends when `spanEvent` leaves scope.
+    pinpoint::helper::ScopedSpanEvent spanEvent(span, "handle_db_status");
+
     std::stringstream json_response;
     json_response << "{\n";
     json_response << "  \"service\": \"MySQL Database Demo with Pinpoint Tracing\",\n";
@@ -537,7 +539,6 @@ void handle_db_status(const httplib::Request& req, httplib::Response& res) {
     res.status = 200;
     
     std::cout << "Request handled: " << req.path << " -> Status info returned" << std::endl;
-    spanEvent->EndEvent();
 }
 
 int main() {

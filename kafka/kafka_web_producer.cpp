@@ -32,9 +32,9 @@ ExampleDeliveryReportCb g_dr_cb;
 bool produce_message(const std::string& message_payload, pinpoint::SpanPtr span) {
     if (!g_producer) return false;
 
-    // Create Span Event for Kafka Produce
-    auto se = span->NewSpanEvent("KafkaProduce");
-    se->SetServiceType(pinpoint::SERVICE_TYPE_KAFKA);
+    // Create Span Event for Kafka Produce; the RAII guard ends it on every
+    // exit path (including the early error return below).
+    pinpoint::helper::ScopedSpanEvent se(span, "KafkaProduce", pinpoint::SERVICE_TYPE_KAFKA);
     se->SetEndPoint(g_brokers);
     se->SetDestination(g_topic_str);
 
@@ -57,14 +57,12 @@ bool produce_message(const std::string& message_payload, pinpoint::SpanPtr span)
     if (resp != RdKafka::ERR_NO_ERROR) {
         std::cerr << "% Produce failed: " << RdKafka::err2str(resp) << std::endl;
         se->SetError(RdKafka::err2str(resp));
-        se->EndEvent();
         delete headers;
         return false;
     } else {
         g_producer->poll(0); // trigger callbacks
     }
 
-    se->EndEvent();
     return true;
 }
 

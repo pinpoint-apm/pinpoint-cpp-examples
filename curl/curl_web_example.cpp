@@ -36,9 +36,9 @@ bool perform_curl_request(const std::string& url, pinpoint::SpanPtr span, std::s
     CURLcode res;
     struct curl_slist* headers = NULL;
 
-    // Create SpanEvent for the outgoing HTTP call
-    auto se = span->NewSpanEvent("execute_curl");
-    se->SetServiceType(pinpoint::SERVICE_TYPE_CPP_HTTP_CLIENT);
+    // Create SpanEvent for the outgoing HTTP call; the RAII guard ends it on
+    // every exit path (including the early error return below).
+    pinpoint::helper::ScopedSpanEvent se(span, "execute_curl", pinpoint::SERVICE_TYPE_CPP_HTTP_CLIENT);
     se->SetDestination(url);
     
     // Record URL annotation
@@ -66,8 +66,7 @@ bool perform_curl_request(const std::string& url, pinpoint::SpanPtr span, std::s
         if(res != CURLE_OK) {
             std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
             se->SetError(curl_easy_strerror(res));
-            se->EndEvent();
-            
+
             curl_easy_cleanup(curl);
             curl_slist_free_all(headers);
             return false;
@@ -81,7 +80,6 @@ bool perform_curl_request(const std::string& url, pinpoint::SpanPtr span, std::s
         curl_slist_free_all(headers);
     }
 
-    se->EndEvent();
     return true;
 }
 

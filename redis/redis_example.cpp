@@ -14,9 +14,8 @@ void execute_command(redisContext *c, pinpoint::SpanPtr span, const char *format
     vsnprintf(command_buf, sizeof(command_buf), format, ap);
     va_end(ap);
 
-    // Start Span Event for Redis Command
-    auto span_event = span->NewSpanEvent("redis_command");
-    span_event->SetServiceType(pinpoint::SERVICE_TYPE_REDIS);
+    // Start Span Event for Redis Command; the RAII guard ends it on scope exit.
+    pinpoint::helper::ScopedSpanEvent span_event(span, "redis_command", pinpoint::SERVICE_TYPE_REDIS);
     span_event->SetEndPoint("localhost:6379");
     span_event->SetDestination("redis-server");
     
@@ -56,8 +55,6 @@ void execute_command(redisContext *c, pinpoint::SpanPtr span, const char *format
         }
         freeReplyObject(reply);
     }
-    
-    span_event->EndEvent();
 }
 
 int main(int argc, char **argv) {
