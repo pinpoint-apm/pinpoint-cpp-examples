@@ -63,12 +63,14 @@ ensure_configure() {
     local args=()
     local opt
     for opt in "$@"; do args+=("-D${opt}=ON"); done
+    # ${args[@]+...}: bash 3.2 (macOS) treats an empty array as unset under
+    # `set -u`, and run_nginx.sh configures with no example toggle at all.
     if [ ! -f "$BUILD_DIR/CMakeCache.txt" ]; then
-        log "configuring (--preset $PRESET) ${args[*]}"
-        ( cd "$REPO_ROOT" && cmake --preset "$PRESET" "${args[@]}" )
+        log "configuring (--preset $PRESET) ${args[*]:-}"
+        ( cd "$REPO_ROOT" && cmake --preset "$PRESET" ${args[@]+"${args[@]}"} )
     else
-        log "updating cache: ${args[*]}"
-        ( cd "$REPO_ROOT" && cmake -B "$BUILD_DIR" "${args[@]}" >/dev/null )
+        log "updating cache: ${args[*]:-}"
+        ( cd "$REPO_ROOT" && cmake -B "$BUILD_DIR" ${args[@]+"${args[@]}"} >/dev/null )
     fi
 }
 
