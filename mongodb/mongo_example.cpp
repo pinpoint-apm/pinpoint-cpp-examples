@@ -195,8 +195,10 @@ int main(int argc, char* argv[]) {
 
     // Pinpoint Agent Init
     setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-mongodb-demo", 0);
-    g_agent = pinpoint::CreateAgent();
-    g_agent->Start();
+    if (!pinpoint::StartAgent()) {
+        std::cerr << "failed to start the pinpoint agent: check the agent log" << std::endl;
+    }
+    g_agent = pinpoint::GlobalAgent();
 
     // MongoDB C++ Driver Init (must be constructed once per process and
     // outlive every client created from it)

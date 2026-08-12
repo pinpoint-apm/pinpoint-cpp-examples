@@ -25,8 +25,7 @@ class HelloServiceImpl final : public grpcdemo::Hello::Service {
 
     auto span = GetCurrentSpan();
     pinpoint::helper::ScopedSpanEvent scoped(span, "HelloServiceImpl::UnaryCallUnaryReturn");
-    scoped->GetAnnotations()->AppendString(pinpoint::ANNOTATION_API,
-                                            "UnaryCallUnaryReturn");
+    scoped->SetAnnotation(pinpoint::ANNOTATION_API, "UnaryCallUnaryReturn");
 
     response->set_msg("Unary response: " + request->msg());
     return grpc::Status::OK;
@@ -39,8 +38,7 @@ class HelloServiceImpl final : public grpcdemo::Hello::Service {
 
     auto span = GetCurrentSpan();
     pinpoint::helper::ScopedSpanEvent scoped(span, "HelloServiceImpl::UnaryCallStreamReturn");
-    scoped->GetAnnotations()->AppendString(pinpoint::ANNOTATION_API,
-                                            "UnaryCallStreamReturn");
+    scoped->SetAnnotation(pinpoint::ANNOTATION_API, "UnaryCallStreamReturn");
 
     for (int i = 0; i < 3; ++i) {
       grpcdemo::Greeting resp;
@@ -57,8 +55,7 @@ class HelloServiceImpl final : public grpcdemo::Hello::Service {
 
     auto span = GetCurrentSpan();
     pinpoint::helper::ScopedSpanEvent scoped(span, "HelloServiceImpl::StreamCallUnaryReturn");
-    scoped->GetAnnotations()->AppendString(pinpoint::ANNOTATION_API,
-                                            "StreamCallUnaryReturn");
+    scoped->SetAnnotation(pinpoint::ANNOTATION_API, "StreamCallUnaryReturn");
 
     std::string combined;
     grpcdemo::Greeting msg;
@@ -76,8 +73,7 @@ class HelloServiceImpl final : public grpcdemo::Hello::Service {
 
     auto span = GetCurrentSpan();
     pinpoint::helper::ScopedSpanEvent scoped(span, "HelloServiceImpl::StreamCallStreamReturn");
-    scoped->GetAnnotations()->AppendString(pinpoint::ANNOTATION_API,
-                                            "StreamCallStreamReturn");
+    scoped->SetAnnotation(pinpoint::ANNOTATION_API, "StreamCallStreamReturn");
 
     grpcdemo::Greeting request;
     while (stream->Read(&request)) {
@@ -98,12 +94,15 @@ int main(int argc, char** argv) {
   setenv("PINPOINT_CPP_APPLICATION_NAME", "grpc-server-demo", 0);
   setenv("PINPOINT_CPP_HTTP_COLLECT_URL_STAT", "false", 0);
 
-  auto agent = pinpoint::CreateAgent();
-  // Start() brings the agent up asynchronously: the collector connection and
-  // registration complete on a background thread, so Enable() only turns true
-  // once the collector has accepted the agent. Don't gate startup on it here —
-  // the demo runs regardless and spans are delivered once registration lands.
-  agent->Start();
+  // StartAgent() brings the agent up asynchronously: the collector connection
+  // and registration complete on a background thread, so Enable() only turns
+  // true once the collector has accepted the agent. Don't gate startup on it
+  // here — the demo runs regardless and spans are delivered once registration
+  // lands.
+  if (!pinpoint::StartAgent()) {
+    std::cerr << "failed to start the pinpoint agent: check the agent log" << std::endl;
+  }
+  auto agent = pinpoint::GlobalAgent();
 
   grpc_demo::HelloServiceImpl service;
 

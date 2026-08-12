@@ -218,14 +218,13 @@ int main(int argc, char* argv[]) {
 
     setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-civetweb-demo", 0);
 
-    g_agent = pt_create_agent();
-    if (g_agent == NULL) {
-        fprintf(stderr, "Warning: Failed to create Pinpoint agent. "
-                        "Server will continue without tracing.\n\n");
+    if (!pt_start_agent(NULL)) {
+        fprintf(stderr, "Warning: Failed to start the Pinpoint agent (check the "
+                        "agent log). Server will continue without tracing.\n\n");
     } else {
-        pt_agent_start(g_agent);
-        printf("Pinpoint agent created successfully\n\n");
+        printf("Pinpoint agent started successfully\n\n");
     }
+    g_agent = pt_global_agent();
 
     struct mg_callbacks callbacks;
     memset(&callbacks, 0, sizeof(callbacks));

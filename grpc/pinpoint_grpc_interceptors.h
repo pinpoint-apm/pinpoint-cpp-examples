@@ -37,7 +37,7 @@ class PinpointServerInterceptor final : public grpc::experimental::Interceptor {
           if (server_context_base != nullptr) {
             span_->SetRemoteAddress(server_context_base->peer());
           }
-          span_->GetAnnotations()->AppendString(pinpoint::ANNOTATION_API, rpc_method);
+          span_->SetAnnotation(pinpoint::ANNOTATION_API, rpc_method);
         }
 
         SetCurrentSpan(span_);
@@ -95,11 +95,8 @@ class PinpointClientInterceptor final : public grpc::experimental::Interceptor {
       if (span_event_) {
         span_event_->SetServiceType(pinpoint::SERVICE_TYPE_GRPC_CLIENT);
         span_event_->SetDestination(remote);
-        auto annotations = span_event_->GetAnnotations();
-        if (annotations) {
-          annotations->AppendString(pinpoint::ANNOTATION_HTTP_URL,
-                                    "grpc://" + remote + rpc_method);
-        }
+        span_event_->SetAnnotation(pinpoint::ANNOTATION_HTTP_URL,
+                                   "grpc://" + remote + rpc_method);
 
         if (auto* context = info_->client_context()) {
           GrpcClientTraceContextWriter writer(context);

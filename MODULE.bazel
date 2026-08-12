@@ -8,11 +8,11 @@ bazel_dep(name = "platforms",        version = "0.0.10")
 # pinpoint-cpp-agent has a complete bzlmod build of its own. It isn't on BCR,
 # so we pull it directly from GitHub. The grpc-idl is a git submodule, so
 # init_submodules=True is required.
-bazel_dep(name = "pinpoint-cpp", version = "1.1.0")
+bazel_dep(name = "pinpoint-cpp", version = "2.0.0")
 git_override(
     module_name = "pinpoint-cpp",
     remote = "https://github.com/pinpoint-apm/pinpoint-cpp-agent.git",
-    commit = "9850105027cef9243d1c0e165e663217c1c14866",
+    commit = "6927f2d08b164f0b8b51d7fde8ed8b6ad7d99ee3",
     init_submodules = True,
     # Bazel 8 dropped cc_proto_library from @rules_cc; the new home is
     # @com_google_protobuf//bazel. pinpoint's 3rd_party/BUILD still uses the

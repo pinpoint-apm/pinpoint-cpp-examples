@@ -185,8 +185,10 @@ int main(int argc, char* argv[]) {
 
     // Pinpoint Agent Init
     setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-curl-demo", 0);
-    g_agent = pinpoint::CreateAgent();
-    g_agent->Start();
+    if (!pinpoint::StartAgent()) {
+        std::cerr << "failed to start the pinpoint agent: check the agent log" << std::endl;
+    }
+    g_agent = pinpoint::GlobalAgent();
 
     httplib::Server server;
     server.Get("/run_request", handle_run_request);

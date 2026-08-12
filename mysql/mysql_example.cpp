@@ -544,8 +544,10 @@ int main() {
     setenv("PINPOINT_CPP_SQL_ENABLE_SQL_STATS", "true", 0);
     setenv("PINPOINT_CPP_HTTP_COLLECT_URL_STAT", "true", 0);
     
-    auto agent = pinpoint::CreateAgent();
-    agent->Start();
+    if (!pinpoint::StartAgent()) {
+        std::cerr << "failed to start the pinpoint agent: check the agent log" << std::endl;
+    }
+    auto agent = pinpoint::GlobalAgent();
     
     // Database configuration
     DatabaseConfig config;

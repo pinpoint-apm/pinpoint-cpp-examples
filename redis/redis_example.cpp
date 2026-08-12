@@ -37,14 +37,9 @@ void execute_command(redisContext *c, pinpoint::SpanPtr span, const char *format
     span_event->SetEndPoint(g_redis_endpoint);
     span_event->SetDestination("redis-server");
 
-    // Record the actual command
-    auto annotations = span_event->GetAnnotations();
-    // ANNOTATION_ARGS0 (41) is often used for args, but we can stick to conventions or just use a generic string
-    // Pinpoint doesn't have a strict Redis command annotation constant exposed in the header provided,
-    // but usually SQL or generic arguments are fine. We'll use a custom key or just log it.
-    // Let's assuming we might want to record the command string.
-    // span_event->SetSqlQuery(command_buf); // Redis is not SQL, but this field is often used for query-like things.
-    // Alternatively, just use description or error if failed.
+    // Record the command itself. Redis has no dedicated annotation key, so the
+    // generic API slot carries it.
+    span_event->SetAnnotation(pinpoint::ANNOTATION_API, command_buf);
 
     // Re-start va_list for redisCommand
     va_start(ap, format);
@@ -199,8 +194,10 @@ int main(int argc, char **argv) {
 
     // Initialize Pinpoint Agent
     setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-redis-demo", 0);
-    g_agent = pinpoint::CreateAgent();
-    g_agent->Start();
+    if (!pinpoint::StartAgent()) {
+        std::cerr << "failed to start the pinpoint agent: check the agent log" << std::endl;
+    }
+    g_agent = pinpoint::GlobalAgent();
 
     httplib::Server server;
     server.Get("/run_demo", wrap_handler(handle_run_demo));

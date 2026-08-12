@@ -74,8 +74,10 @@ int main() {
     setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-cpptrace-demo", 0);
     setenv("PINPOINT_CPP_ENABLE_CALLSTACK_TRACE", "true", 0);
 
-    auto agent = pinpoint::CreateAgent();
-    agent->Start();
+    if (!pinpoint::StartAgent()) {
+        std::cerr << "failed to start the pinpoint agent: check the agent log" << std::endl;
+    }
+    auto agent = pinpoint::GlobalAgent();
     httplib::Server server;
     
     // Register /users/:id endpoint

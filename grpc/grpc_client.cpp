@@ -50,7 +50,7 @@ bool CallUnary(grpcdemo::Hello::Stub* stub, pinpoint::SpanPtr span) {
     span->SetError(status.error_message());
     return false;
   }
-  span->GetAnnotations()->AppendString(pinpoint::ANNOTATION_API, response.msg());
+  span->SetAnnotation(pinpoint::ANNOTATION_API, response.msg());
   return true;
 }
 
@@ -181,12 +181,15 @@ int main(int argc, char** argv) {
 
   setenv("PINPOINT_CPP_APPLICATION_NAME", "grpc-client-demo", 0);
 
-  g_agent = pinpoint::CreateAgent();
-  // Start() brings the agent up asynchronously: the collector connection and
-  // registration complete on a background thread, so Enable() only turns true
-  // once the collector has accepted the agent. Don't gate startup on it here —
-  // the demo runs regardless and spans are delivered once registration lands.
-  g_agent->Start();
+  // StartAgent() brings the agent up asynchronously: the collector connection
+  // and registration complete on a background thread, so Enable() only turns
+  // true once the collector has accepted the agent. Don't gate startup on it
+  // here — the demo runs regardless and spans are delivered once registration
+  // lands.
+  if (!pinpoint::StartAgent()) {
+    std::cerr << "failed to start the pinpoint agent: check the agent log" << std::endl;
+  }
+  g_agent = pinpoint::GlobalAgent();
 
   // The channel and stub are thread-safe and shared across requests.
   g_stub = grpc_demo::CreateStubWithInterceptor(g_grpc_target);
