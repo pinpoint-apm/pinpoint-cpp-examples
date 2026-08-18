@@ -382,7 +382,7 @@ The initial schema and seed data come from [`mysql/init.sql`](mysql/init.sql), a
 
 ## nginx — dynamic module in nginx's pre-fork worker model
 
-An nginx dynamic module ([`nginx/ngx_http_pinpoint_module.c`](nginx/ngx_http_pinpoint_module.c)) using the **C API** (`pt_*`), copied from the agent repository's `example/nginx`. It demonstrates the pre-fork lifecycle contract: the **master** process makes no agent API calls, each **worker** starts its own agent in `init_process` and shuts it down in `exit_process`, and cache manager/loader processes are skipped. One span per completed request is recorded from the LOG phase with the request's real start time and status, honoring incoming `Pinpoint-*` headers. App name: `cpp-nginx-demo`.
+An nginx dynamic module ([`nginx/ngx_http_pinpoint_module.c`](nginx/ngx_http_pinpoint_module.c)) using the **C API** (`pt_*`), originally from the agent repository's `example/nginx` (removed upstream since). It demonstrates the pre-fork lifecycle contract: the **master** process makes no agent API calls, each **worker** starts its own agent in `init_process` and shuts it down in `exit_process`, and cache manager/loader processes are skipped. One span per completed request is recorded from the LOG phase with the request's real start time and status, honoring incoming `Pinpoint-*` headers. App name: `cpp-nginx-demo`.
 
 With `worker_processes 2` you get two agent instances in the Pinpoint UI, each with its own auto-generated agent id — that is the point of the example, not a misconfiguration.
 
