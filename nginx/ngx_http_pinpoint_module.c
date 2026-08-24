@@ -26,10 +26,13 @@
  *
  * Request tracing is deliberately minimal: one span per completed request,
  * recorded retroactively from the LOG phase (nginx knows the request's start
- * time, so the span still carries the real timing). Incoming Pinpoint-*
- * headers are honored, so this nginx joins distributed traces started by its
- * callers. Propagating context onward to upstreams is out of scope here — see
- * the nginx section of the repository README.
+ * time, so the span still carries the real timing), plus one span event for
+ * the upstream call when the request was proxied. Incoming Pinpoint-* headers
+ * are honored, so this nginx joins distributed traces started by its callers.
+ * Propagating context *onward* to upstreams is out of scope and cannot work in
+ * this design: the span does not exist yet when nginx sends the upstream
+ * request, so there is nothing to inject — see the nginx section of the
+ * repository README.
  *
  * nginx.conf:
  *
@@ -254,9 +257,71 @@ ngx_http_pinpoint_to_cstr(const ngx_str_t *src, char *dst, size_t dst_size)
     dst[n] = '\0';
 }
 
+/* Records the upstream call as a span event when nginx proxied the request.
+ * nginx keeps one ngx_http_upstream_state_t per try in r->upstream_states
+ * (proxy_next_upstream retries add more) with the peer it talked to, how long
+ * it took and what it answered — exactly what a span event models. A request
+ * nginx served by itself has no states, and then the span carries no event.
+ *
+ * The span is retroactive and the C API only sets an event's *start* time (its
+ * end is the pt_span_event_end call below), so retries are folded into a
+ * single event: it starts the total upstream time before `end_ms` and reports
+ * the peer and status of the try that produced the response. Per-try events
+ * would need an end-time setter to carry honest durations.
+ */
+static void
+ngx_http_pinpoint_record_upstream(pt_span_t span, ngx_http_request_t *r,
+                                  int64_t end_ms)
+{
+    ngx_http_upstream_state_t  *state;
+    ngx_http_upstream_state_t  *last;
+    pt_span_event_t             event;
+    ngx_uint_t                  i;
+    int64_t                     total;
+    char                        peer[256];
+    char                        uri[1024];
+
+    if (r->upstream_states == NULL || r->upstream_states->nelts == 0) {
+        return;
+    }
+
+    state = r->upstream_states->elts;
+    last = &state[r->upstream_states->nelts - 1];
+
+    /* (ngx_msec_t) -1 marks a try that never got a response timed. */
+    total = 0;
+    for (i = 0; i < r->upstream_states->nelts; i++) {
+        if (state[i].response_time != (ngx_msec_t) -1) {
+            total += (int64_t) state[i].response_time;
+        }
+    }
+
+    event = pt_span_new_event_with_type(span, "upstream",
+                                        PT_SERVICE_TYPE_CPP_HTTP_CLIENT);
+    pt_span_event_set_start_time_ms(event, end_ms - total);
+
+    if (last->peer != NULL) {
+        ngx_http_pinpoint_to_cstr(last->peer, peer, sizeof(peer));
+        pt_span_event_set_end_point(event, peer);
+        pt_span_event_set_destination(event, peer);
+    }
+
+    ngx_http_pinpoint_to_cstr(&r->uri, uri, sizeof(uri));
+    pt_span_event_set_annotation_string(event, PT_ANNOTATION_HTTP_URL, uri);
+
+    if (last->status) {
+        pt_span_event_set_annotation_int(event, PT_ANNOTATION_HTTP_STATUS_CODE,
+                                         (int32_t) last->status);
+    }
+
+    pt_span_event_end(event);
+    pt_span_event_destroy(event);
+}
+
 static ngx_int_t
 ngx_http_pinpoint_log_handler(ngx_http_request_t *r)
 {
+    ngx_time_t         *tp;
     pt_context_reader_t reader;
     pt_span_t           span;
     char                uri[1024];
@@ -306,6 +371,12 @@ ngx_http_pinpoint_log_handler(ngx_http_request_t *r)
                            : (int) r->headers_out.status;
     pt_span_set_status_code(span, status);
     pt_span_set_url_stat(span, uri, method, status);
+
+    /* nginx's cached clock is refreshed per event-loop iteration, so it is the
+     * upstream phase's end for our purposes. */
+    tp = ngx_timeofday();
+    ngx_http_pinpoint_record_upstream(span, r,
+        (int64_t) tp->sec * 1000 + (int64_t) tp->msec);
 
     pt_span_end(span);
     pt_span_destroy(span);

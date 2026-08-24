@@ -1,6 +1,6 @@
 # civetweb — HTTP server (C wrapper API)
 
-A CivetWeb HTTP server traced with pinpoint-cpp-agent's **C API** (`pt_*`). Manually constructs the header carriers and calls `pt_agent_new_span_with_reader` / `pt_trace_http_server_request` / `pt_trace_http_server_response`. App name: `cpp-civetweb-demo`.
+A CivetWeb HTTP server traced with pinpoint-cpp-agent's **C API** (`pt_*`). Manually constructs the header carriers and calls `pt_agent_new_span_with_reader` / `pt_trace_http_server_request` / `pt_span_new_event` / `pt_trace_http_server_response`. App name: `cpp-civetweb-demo`.
 
 **Requires:** nothing beyond the toolchain — CivetWeb is built from source by both build systems (CMake `FetchContent`, Bazel `rules_foreign_cc`).
 

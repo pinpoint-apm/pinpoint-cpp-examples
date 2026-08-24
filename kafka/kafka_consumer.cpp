@@ -91,10 +91,23 @@ int main(int argc, char **argv) {
             span->SetEndPoint(brokers);
             span->SetRemoteAddress(brokers);
             
-            // We can record the message payload or offset as annotation if needed
-            if (msg->payload()) {
-                std::string payload(static_cast<const char *>(msg->payload()), msg->len());
-                std::cout << "Consumed message: " << payload << std::endl;
+            // The span above is the Kafka entry point; this event is the
+            // work done on the message, so the trace carries a call tree
+            // instead of a bare root. The inner scope ends the RAII guard
+            // before EndSpan() below.
+            {
+                pinpoint::helper::ScopedSpanEvent se(span, "ProcessMessage");
+                se->SetEndPoint(brokers);
+                // Kafka has no dedicated annotation key, so the generic API
+                // slot carries which record this was (as in redis_example).
+                se->SetAnnotation(pinpoint::ANNOTATION_API,
+                                  topic_str + "[" + std::to_string(msg->partition()) +
+                                  "] offset " + std::to_string(msg->offset()));
+
+                if (msg->payload()) {
+                    std::string payload(static_cast<const char *>(msg->payload()), msg->len());
+                    std::cout << "Consumed message: " << payload << std::endl;
+                }
             }
             
             span->EndSpan();

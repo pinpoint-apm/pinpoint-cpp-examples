@@ -109,6 +109,10 @@ static int handle_users(struct mg_connection* conn, void* cbdata) {
     pt_trace_http_server_request(span, remote_addr,
                                  req_info->request_uri, &request_reader);
 
+    /* The handler's own work as a span event: a span with no events
+     * shows up in the UI as a bare root with an empty call tree. */
+    pt_span_event_t event = pt_span_new_event(span, "handle_users");
+
     const char* json_response =
         "[\n"
         "  {\"id\": 1, \"name\": \"Alice\", \"email\": \"alice@example.com\"},\n"
@@ -124,6 +128,9 @@ static int handle_users(struct mg_connection* conn, void* cbdata) {
               "\r\n"
               "%s",
               (int)strlen(json_response), json_response);
+
+    pt_span_event_end(event);
+    pt_span_event_destroy(event);
 
     static const char* response_pairs[] = {
         "Content-Type", "application/json",
@@ -146,6 +153,8 @@ static int handle_health(struct mg_connection* conn, void* cbdata) {
     (void)cbdata;
     const struct mg_request_info* req_info = mg_get_request_info(conn);
 
+    pt_span_event_t event = NULL;
+
     pt_context_reader_t ctx_reader = { conn, civetweb_header_get };
     pt_span_t span = pt_agent_new_span_with_reader(
         g_agent, req_info->request_method, req_info->request_uri, &ctx_reader);
@@ -159,6 +168,7 @@ static int handle_health(struct mg_connection* conn, void* cbdata) {
                  req_info->remote_addr, req_info->remote_port);
         pt_trace_http_server_request(span, remote_addr,
                                      req_info->request_uri, &request_reader);
+        event = pt_span_new_event(span, "handle_health");
     }
 
     const char* response = "{\"status\": \"healthy\", \"service\": \"civetweb-example\"}\n";
@@ -171,6 +181,9 @@ static int handle_health(struct mg_connection* conn, void* cbdata) {
               (int)strlen(response), response);
 
     if (span != NULL) {
+        pt_span_event_end(event);
+        pt_span_event_destroy(event);
+
         static const char* response_pairs[] = {
             "Content-Type", "application/json",
         };

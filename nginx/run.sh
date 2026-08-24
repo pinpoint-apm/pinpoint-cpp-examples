@@ -109,6 +109,14 @@ http {
         location = /api/forbidden {
             deny all;
         }
+
+        # Proxied, so its span carries an upstream span event. The upstream is
+        # this same server, which keeps the demo to one process; the proxied
+        # hop is a request of its own and gets its own span (nginx forwards no
+        # Pinpoint-* headers, so the two are not linked — see the README).
+        location = /api/proxy {
+            proxy_pass http://127.0.0.1:$NGINX_PORT/api/hello;
+        }
     }
 }
 EOF
@@ -118,12 +126,16 @@ EOF
     wait_agent_ready nginx "$NGINX_WORKERS"
 
     test_endpoints
-    load_test "http://localhost:$NGINX_PORT/api/hello" "http://localhost:$NGINX_PORT/api/forbidden"
+    load_test "http://localhost:$NGINX_PORT/api/hello" "http://localhost:$NGINX_PORT/api/forbidden" \
+        "http://localhost:$NGINX_PORT/api/proxy"
     demo_running
 }
 
 test_endpoints() {
     curl_test "GET /api/hello" "http://localhost:$NGINX_PORT/api/hello"
+    # Proxied to this same server: the span for this request carries an
+    # upstream span event, the proxied hop gets a span of its own.
+    curl_test "GET /api/proxy" "http://localhost:$NGINX_PORT/api/proxy"
     # Traced as well, with status 403 on the span.
     log "test: GET /api/forbidden (expects 403)"
     curl -sS --max-time 10 -o /dev/null -w "  http=%{http_code}\n" \

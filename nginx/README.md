@@ -40,15 +40,19 @@ nginx wipes the environment of its workers (everything but `TZ`), so `PINPOINT_C
 **Endpoints** (`localhost:8095`, generated config):
 - `GET /api/hello` — static JSON, traced with status 200
 - `GET /api/forbidden` — `deny all`, traced with status 403
+- `GET /api/proxy` — `proxy_pass` back to `/api/hello` on this same server; its span carries an **upstream span event** (peer, status, and the upstream time), and the proxied hop is traced as a span of its own
 
 **Test:**
 
 ```bash
 curl http://localhost:8095/api/hello
 curl -i http://localhost:8095/api/forbidden
+curl http://localhost:8095/api/proxy
 ```
 
 The script's nginx is built `--without-http_rewrite_module --without-http_gzip_module` to avoid the PCRE2/zlib build dependencies, so the demo config serves a static file instead of using `return 200`.
 
-**Deliberately out of scope** (see the module's header comment): injecting `Pinpoint-*` headers into proxied upstream requests, copying header values out of nginx storage for HTTP/2/3, span events for upstream calls, and per-location URL templates.
+A proxied request additionally gets one span event for the upstream call, read from `r->upstream_states` at LOG time: the peer, the status it answered, and the upstream time. Because the C API only sets an event's start time, `proxy_next_upstream` retries collapse into that single event rather than appearing one by one.
+
+**Deliberately out of scope** (see the module's header comment): injecting `Pinpoint-*` headers into proxied upstream requests, copying header values out of nginx storage for HTTP/2/3, and per-location URL templates. Header injection is not just unimplemented — it cannot work in this design, since the span is created after the request completes and so does not exist when nginx sends the upstream request.
 
