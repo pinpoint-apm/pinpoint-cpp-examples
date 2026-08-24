@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Build and smoke-test the nginx dynamic module example.
 #
+#     ./scripts/run_nginx.sh               # default: up + smoke test
+#     ./scripts/run_nginx.sh test          # re-run the requests, stack already up
+#     ./scripts/run_nginx.sh down          # stop it
+#
 # Unlike the other examples this one is not a CMake/Bazel target: an nginx
 # module builds with nginx's own build system. This script fetches the nginx
 # sources, builds them together with the module against the agent library from
@@ -9,68 +13,80 @@
 SCRIPT_NAME="run_nginx"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
 
+DEMO_NAME="nginx"
+PROCS="nginx"
+
 NGINX_VERSION="${NGINX_VERSION:-1.28.0}"
 NGINX_DIR="$BUILD_DIR/nginx"
 NGINX_SRC="$NGINX_DIR/nginx-$NGINX_VERSION"
 NGINX_PREFIX="$NGINX_DIR/prefix"
 NGINX_PORT="${NGINX_PORT:-8095}"
+# worker_processes 2: each worker starts its own agent and shows up as its own
+# agent instance in the Pinpoint UI — the point of the pre-fork example. Both
+# register into the same agent log, so wait_agent_ready waits for two.
+NGINX_WORKERS=2
+KILL_PORTS="$NGINX_PORT"
 
-ensure_pinpoint_env
-# No example toggle: the module is built by nginx, we only need the agent
-# library and headers that every CMake configure produces.
-ensure_configure
-build_targets pinpoint_cpp
+up() {
+    down
+    ensure_pinpoint_env
+    # No example toggle: the module is built by nginx, we only need the agent
+    # library and headers that every CMake configure produces.
+    ensure_configure
+    build_targets pinpoint_cpp
 
-AGENT_INC="$BUILD_DIR/_deps/pinpoint_cpp-src/include"
-AGENT_LIB="$BUILD_DIR/_deps/pinpoint_cpp-build"
-[ -d "$AGENT_INC" ] || die "agent headers not found at $AGENT_INC"
+    local agent_inc="$BUILD_DIR/_deps/pinpoint_cpp-src/include"
+    local agent_lib="$BUILD_DIR/_deps/pinpoint_cpp-build"
+    [ -d "$agent_inc" ] || die "agent headers not found at $agent_inc"
 
-if [ ! -d "$NGINX_SRC" ]; then
-    log "fetching nginx-$NGINX_VERSION sources"
-    mkdir -p "$NGINX_DIR"
-    curl -fsSL "https://nginx.org/download/nginx-$NGINX_VERSION.tar.gz" \
-        | tar xz -C "$NGINX_DIR" || die "failed to fetch nginx-$NGINX_VERSION"
-fi
+    if [ ! -d "$NGINX_SRC" ]; then
+        log "fetching nginx-$NGINX_VERSION sources"
+        mkdir -p "$NGINX_DIR"
+        curl -fsSL "https://nginx.org/download/nginx-$NGINX_VERSION.tar.gz" \
+            | tar xz -C "$NGINX_DIR" || die "failed to fetch nginx-$NGINX_VERSION"
+    fi
 
-# Rebuild whenever the module source is newer than the installed binary, so
-# edits to ngx_http_pinpoint_module.c are picked up without a manual clean.
-if [ ! -x "$NGINX_PREFIX/sbin/nginx" ] \
-   || [ "$REPO_ROOT/nginx/ngx_http_pinpoint_module.c" -nt "$NGINX_PREFIX/sbin/nginx" ]; then
-    log "building nginx-$NGINX_VERSION with ngx_http_pinpoint_module"
-    # rpath: the module links against the agent in the CMake build tree, which
-    # is not on the default loader path.
-    # --without-http_{rewrite,gzip}_module: drops the PCRE2/zlib build deps,
-    # neither of which this example needs.
-    ( cd "$NGINX_SRC" \
-      && ./configure \
-            --prefix="$NGINX_PREFIX" \
-            --add-dynamic-module="$REPO_ROOT/nginx" \
-            --with-cc-opt="-I$AGENT_INC" \
-            --with-ld-opt="-L$AGENT_LIB -lpinpoint_cpp -Wl,-rpath,$AGENT_LIB" \
-            --without-http_rewrite_module \
-            --without-http_gzip_module \
-      && make -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)" \
-      && make install ) >"$NGINX_DIR/build.log" 2>&1 \
-        || die "nginx build failed, see $NGINX_DIR/build.log"
-fi
+    # Rebuild whenever the module source is newer than the installed binary, so
+    # edits to ngx_http_pinpoint_module.c are picked up without a manual clean.
+    if [ ! -x "$NGINX_PREFIX/sbin/nginx" ] \
+       || [ "$REPO_ROOT/nginx/ngx_http_pinpoint_module.c" -nt "$NGINX_PREFIX/sbin/nginx" ]; then
+        log "building nginx-$NGINX_VERSION with ngx_http_pinpoint_module"
+        # rpath: the module links against the agent in the CMake build tree, which
+        # is not on the default loader path.
+        # --without-http_{rewrite,gzip}_module: drops the PCRE2/zlib build deps,
+        # neither of which this example needs.
+        ( cd "$NGINX_SRC" \
+          && ./configure \
+                --prefix="$NGINX_PREFIX" \
+                --add-dynamic-module="$REPO_ROOT/nginx" \
+                --with-cc-opt="-I$agent_inc" \
+                --with-ld-opt="-L$agent_lib -lpinpoint_cpp -Wl,-rpath,$agent_lib" \
+                --without-http_rewrite_module \
+                --without-http_gzip_module \
+          && make -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)" \
+          && make install ) >"$NGINX_DIR/build.log" 2>&1 \
+            || die "nginx build failed, see $NGINX_DIR/build.log"
+    fi
 
-# nginx wipes the environment of its workers (except TZ), so the agent is
-# configured through a YAML file instead of PINPOINT_CPP_* variables.
-cat >"$NGINX_PREFIX/conf/pinpoint.yaml" <<EOF
+    # nginx wipes the environment of its workers (except TZ), so the agent is
+    # configured through a YAML file instead of PINPOINT_CPP_* variables. That
+    # includes the log path start_demo would otherwise pass through the
+    # environment, which is what wait_agent_ready polls.
+    cat >"$NGINX_PREFIX/conf/pinpoint.yaml" <<EOF
 ApplicationName: "cpp-nginx-demo"
 AgentName: "cpp-nginx-demo"
 Collector:
   Host: "$PINPOINT_CPP_COLLECTOR_HOST"
+Log:
+  FilePath: "$(agent_log_path nginx)"
 EOF
 
-echo '{"message":"hello from nginx"}' >"$NGINX_PREFIX/html/hello.json"
+    echo '{"message":"hello from nginx"}' >"$NGINX_PREFIX/html/hello.json"
 
-# worker_processes 2: each worker starts its own agent and shows up as its own
-# agent instance in the Pinpoint UI — the point of the pre-fork example.
-cat >"$NGINX_PREFIX/conf/nginx.conf" <<EOF
+    cat >"$NGINX_PREFIX/conf/nginx.conf" <<EOF
 load_module modules/ngx_http_pinpoint_module.so;
 
-worker_processes 2;
+worker_processes $NGINX_WORKERS;
 daemon off;
 error_log logs/error.log info;
 events { worker_connections 128; }
@@ -98,19 +114,21 @@ http {
 }
 EOF
 
-PIDFILE="$(mktemp)"
-LOGFILE="$(mktemp)"
-trap 'stop_bg "$PIDFILE"; log "nginx log: $LOGFILE, agent log: $NGINX_PREFIX/logs/error.log"' EXIT
+    start_demo nginx "$NGINX_PREFIX/sbin/nginx" -p "$NGINX_PREFIX"
+    wait_for_http "http://localhost:$NGINX_PORT/api/hello" 30
+    wait_agent_ready nginx "$NGINX_WORKERS"
 
-start_bg "$PIDFILE" "$LOGFILE" -- "$NGINX_PREFIX/sbin/nginx" -p "$NGINX_PREFIX"
-wait_for_http "http://localhost:$NGINX_PORT/api/hello" 30
+    test_endpoints
+    load_test "http://localhost:$NGINX_PORT/api/hello" "http://localhost:$NGINX_PORT/api/forbidden"
+    demo_running
+}
 
-curl_test "GET /api/hello" "http://localhost:$NGINX_PORT/api/hello"
-# Traced as well, with status 403 on the span.
-log "test: GET /api/forbidden (expects 403)"
-curl -sS --max-time 10 -o /dev/null -w "  http=%{http_code}\n" \
-    "http://localhost:$NGINX_PORT/api/forbidden"
+test_endpoints() {
+    curl_test "GET /api/hello" "http://localhost:$NGINX_PORT/api/hello"
+    # Traced as well, with status 403 on the span.
+    log "test: GET /api/forbidden (expects 403)"
+    curl -sS --max-time 10 -o /dev/null -w "  http=%{http_code}\n" \
+        "http://localhost:$NGINX_PORT/api/forbidden"
+}
 
-load_test "http://localhost:$NGINX_PORT/api/hello" "http://localhost:$NGINX_PORT/api/forbidden"
-
-log "nginx example PASS"
+demo_main "$@"

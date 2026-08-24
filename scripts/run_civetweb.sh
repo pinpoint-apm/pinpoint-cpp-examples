@@ -1,25 +1,35 @@
 #!/usr/bin/env bash
 # Build and smoke-test the civetweb example.
+#
+#     ./scripts/run_civetweb.sh            # default: up + smoke test
+#     ./scripts/run_civetweb.sh test       # re-run the requests, stack already up
+#     ./scripts/run_civetweb.sh down       # stop it
 
 SCRIPT_NAME="run_civetweb"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
 
-ensure_pinpoint_env
-ensure_configure BUILD_CIVETWEB_EXAMPLE
-build_targets civetweb_example
+DEMO_NAME="civetweb"
+PROCS="civetweb"
+KILL_PORTS="8080"
 
-PIDFILE="$(mktemp)"
-LOGFILE="$(mktemp)"
-trap 'stop_bg "$PIDFILE"; log "server log: $LOGFILE"' EXIT
+up() {
+    down
+    ensure_pinpoint_env
+    ensure_configure BUILD_CIVETWEB_EXAMPLE
+    build_targets civetweb_example
 
-# civetweb_example reads Enter to stop; feed an empty stdin so it cannot
-# accidentally consume terminal input from this script.
-start_bg "$PIDFILE" "$LOGFILE" -- "$BIN_DIR/civetweb_example" </dev/null
-wait_for_http "http://localhost:8080/api/health" 30
+    start_demo civetweb "$BIN_DIR/civetweb_example"
+    wait_for_http "http://localhost:8080/api/health" 30
+    wait_agents_ready
 
-curl_test "GET /api/users"  "http://localhost:8080/api/users"
-curl_test "GET /api/health" "http://localhost:8080/api/health"
+    test_endpoints
+    load_test "http://localhost:8080/api/users" "http://localhost:8080/api/health"
+    demo_running
+}
 
-load_test "http://localhost:8080/api/users" "http://localhost:8080/api/health"
+test_endpoints() {
+    curl_test "GET /api/users"  "http://localhost:8080/api/users"
+    curl_test "GET /api/health" "http://localhost:8080/api/health"
+}
 
-log "civetweb example PASS"
+demo_main "$@"

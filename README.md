@@ -91,13 +91,25 @@ Each example has a `scripts/run_<name>.sh` that handles configure, build, option
 ./scripts/run_redis.sh         # also brings up the redis container
 ```
 
-Containers are left running after the script exits (idempotent re-use on the next run). Stop them with `docker rm -f <name>` when you are done. Override the collector or preset via env:
+Every script takes an `up` (default) / `test` / `down` subcommand, the same way the python agent's `examples/<demo>/run.sh` drivers do:
+
+```bash
+./scripts/run_redis.sh              # up: build, start, wait for the agent, smoke-test
+./scripts/run_redis.sh test         # re-run the requests against the running stack
+./scripts/run_redis.sh down         # stop the example processes
+```
+
+`up` **leaves the stack running** on purpose. The agent's registration handshake with the collector takes about five seconds, and nothing recorded before it lands ever reaches the collector — so `up` waits for `success to register the agent` in the agent log before sending the first request, and then keeps the processes alive so the spans finish streaming and the endpoints stay hittable while you look at them in the Pinpoint UI. Without a reachable collector the wait times out after 60s with a warning and the smoke test runs anyway.
+
+Each process writes two logs under `$RUN_DIR` (`/tmp/pinpoint-cpp-demo`, override with `PINPOINT_DEMO_RUN_DIR`): `<name>.log` for the example's own output and `<name>.agent.log` for the agent's. The agent gets its own file because its file sink flushes per line, while its stdout is block-buffered as soon as it is redirected — which is what makes the registration poll reliable.
+
+`down` stops the example processes but leaves the containers running (idempotent re-use on the next run). Stop those with `docker rm -f <name>` when you are done. Override the collector or preset via env:
 
 ```bash
 PINPOINT_CPP_COLLECTOR_HOST=10.0.0.5 PRESET=release ./scripts/run_grpc.sh
 ```
 
-**Load mode:** pass `--load <seconds>` to keep hitting the example's endpoints for that long after the smoke test — useful for producing a steady stream of traces to watch in the Pinpoint UI. Requests fire with a random 50–500ms gap; failures are counted and reported but don't abort the run. `--load 0` disables it, and Ctrl-C stops the load early (partial counts are reported and the servers are still torn down cleanly):
+**Load mode:** pass `--load <seconds>` to keep hitting the example's endpoints for that long after the smoke test — useful for producing a steady stream of traces to watch in the Pinpoint UI. Requests fire with a random 50–500ms gap; failures are counted and reported but don't abort the run. `--load 0` disables it, and Ctrl-C stops the load early (partial counts are reported and the stack stays up, same as any other run):
 
 ```bash
 ./scripts/run_redis.sh --load 60
@@ -137,7 +149,7 @@ A CivetWeb HTTP server traced with pinpoint-cpp-agent's **C API** (`pt_*`). Manu
 **Build & run:**
 
 ```bash
-./scripts/run_civetweb.sh             # build + smoke test
+./scripts/run_civetweb.sh             # build + smoke test (stack stays up; `down` stops it)
 
 # Manual CMake
 cmake -B build/debug -DBUILD_CIVETWEB_EXAMPLE=ON
@@ -171,7 +183,7 @@ A cpp-httplib server that attaches a cpptrace-captured call stack to a Pinpoint 
 **Build & run:**
 
 ```bash
-./scripts/run_cpptrace.sh             # build + smoke test
+./scripts/run_cpptrace.sh             # build + smoke test (stack stays up; `down` stops it)
 
 # Manual CMake (Bazel disabled on macOS — libunwind incompatibility)
 cmake -B build/debug -DBUILD_CPPTRACE_EXAMPLE=ON
@@ -199,7 +211,7 @@ Issues outbound HTTP requests with libcurl while injecting the Pinpoint trace co
 **Build & run:**
 
 ```bash
-./scripts/run_curl.sh                 # build + smoke test
+./scripts/run_curl.sh                 # build + smoke test (stack stays up; `down` stops it)
 
 # Manual CMake
 cmake -B build/debug -DBUILD_CURL_EXAMPLE=ON
@@ -234,7 +246,7 @@ Custom `ClientInterceptor` / `ServerInterceptor` inject and extract the Pinpoint
 **Build & run:**
 
 ```bash
-./scripts/run_grpc.sh                 # starts server + client, smoke-tests, tears down
+./scripts/run_grpc.sh                 # starts server + client, smoke-tests, leaves both up
 
 # Manual CMake
 cmake -B build/debug -DBUILD_GRPC_EXAMPLE=ON
@@ -474,5 +486,5 @@ curl http://localhost:8093/run_demo
 - **`fatal error: 'hiredis.h' / 'bsoncxx/...' file not found` under Bazel** — the Bazel build links against Homebrew-installed system libraries. Verify `brew list hiredis librdkafka mongo-cxx-driver mysql-connector-c++` lists all four (re-run the `brew install` line in Prerequisites if any are missing).
 - **`cpptrace_example` won't build under Bazel on macOS** — cpptrace BCR 1.0.4 forces libunwind, which doesn't compile on macOS. Use the CMake build for this example.
 - **MongoDB / MySQL / Kafka connection refused** — verify the container is running (`docker ps` should show `pinpoint-cpp-examples-<service>`).
-- **Pinpoint traces don't show up in the collector** — confirm the collector is reachable from this host and that `PINPOINT_CPP_COLLECTOR_HOST` points to it. `StartAgent()` brings the agent up asynchronously, and `Enable()` only returns true once the collector has accepted the agent's registration; an unreachable collector leaves the agent disabled (it keeps retrying in the background) and spans are dropped rather than delivered.
+- **Pinpoint traces don't show up in the collector** — confirm the collector is reachable from this host and that `PINPOINT_CPP_COLLECTOR_HOST` points to it. `StartAgent()` brings the agent up asynchronously, and `Enable()` only returns true once the collector has accepted the agent's registration; an unreachable collector leaves the agent disabled (it keeps retrying in the background) and spans are dropped rather than delivered. Grep the run script's agent log for the handshake: `grep 'success to register the agent' /tmp/pinpoint-cpp-demo/<name>.agent.log`.
 - **`cmake --build build/debug` produces no example binaries** — all `BUILD_*_EXAMPLE` options default to OFF. Use `./scripts/run_<name>.sh` or `cmake -B build/debug -DBUILD_<NAME>_EXAMPLE=ON` first.
