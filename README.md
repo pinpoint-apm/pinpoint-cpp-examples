@@ -8,15 +8,15 @@ Each subdirectory contains a C/C++ application that uses the library named after
 |---|---|
 | Pinpoint Collector | 3.1.0+ |
 | C++ Compiler | C++17 (GCC 8+, Clang 6+) |
-| Build System | CMake 3.21+ or Bazel 8.0+ |
+| Build System | CMake 3.21+ or Bazel 7.0+ |
 | OS | Linux, macOS |
 
-Same as [pinpoint-cpp-agent's requirements](https://github.com/pinpoint-apm/pinpoint-cpp-agent#requirements), except for Bazel: the agent builds with 7.0+, while these examples pin 8.0.0 in `.bazelversion`.
+Same as [pinpoint-cpp-agent's requirements](https://github.com/pinpoint-apm/pinpoint-cpp-agent#requirements); `.bazelversion` pins the agent's own 7.7.1. gRPC and protobuf are the one place these examples have to diverge — the agent pins grpc 1.63.1 / protobuf 29.2, but consuming the agent as an external Bazel module needs grpc 1.74.1 (which floors protobuf at 31.1). `MODULE.bazel` carries the reason.
 
 Two build systems are supported:
 
 - **CMake** — builds pinpoint-cpp-agent via `FetchContent`. All examples build.
-- **Bazel** — uses pinpoint-cpp-agent's own bzlmod build directly.
+- **Bazel** — uses pinpoint-cpp-agent's own bzlmod build directly. Builds every example but cpptrace, whose only BCR module requires Bazel 8.
 
 Each example's own library dependency and backing service — and whether Docker is needed for it — are listed in that example's README.
 
@@ -124,7 +124,7 @@ brew install cmake ninja bazelisk pkg-config
 
 That is the whole toolchain. Per-example system libraries are listed in each example's README; CivetWeb, cpptrace, and cpp-httplib are fetched automatically at build time.
 
-**Bazel only:** The Bazel C++ rules in Bazel 8 require a full **Xcode.app** installation (Command Line Tools alone are not enough — Bazel's `xcode-locator` looks for an Xcode bundle and Bazel crashes with `DottedVersion ... got 'None'` otherwise). Install Xcode from the App Store and run:
+**Bazel only:** The Bazel C++ rules require a full **Xcode.app** installation (Command Line Tools alone are not enough — Bazel's `xcode-locator` looks for an Xcode bundle and Bazel crashes with `DottedVersion ... got 'None'` otherwise). Install Xcode from the App Store and run:
 
 ```bash
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
@@ -149,7 +149,7 @@ Install the equivalent development packages with your package manager — each e
 - **`cmake --build build/debug` produces no example binaries** — all `BUILD_*_EXAMPLE` options default to OFF. Use `./<demo>/run.sh` or `cmake -B build/debug -DBUILD_<NAME>_EXAMPLE=ON` first.
 - **Backing service connection refused** — verify the container is running (`docker ps` should show `pinpoint-cpp-examples-<service>`).
 - **Pinpoint traces don't show up in the collector** — confirm the collector is reachable from this host and that `PINPOINT_CPP_COLLECTOR_HOST` points to it. `StartAgent()` brings the agent up asynchronously, and `Enable()` only returns true once the collector has accepted the agent's registration; an unreachable collector leaves the agent disabled (it keeps retrying in the background) and spans are dropped rather than delivered. Grep the run script's agent log for the handshake: `grep 'success to register the agent' /tmp/pinpoint-cpp-demo/<name>.agent.log`.
-- **`bazel: command not found`** — `brew install bazelisk`. The wrapper reads `.bazelversion` and downloads Bazel 8 automatically.
-- **`bazel build` crashes on macOS with `DottedVersion ... got 'None'`** — Bazel 8 needs a full Xcode install. Command Line Tools alone make `xcodebuild` unavailable, Bazel's auto-detected `xcode_config` records `"None"` as the SDK version, and any C++ action then crashes. Install Xcode.app and `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`, or use the CMake path instead.
+- **`bazel: command not found`** — `brew install bazelisk`. The wrapper reads `.bazelversion` and downloads the pinned version automatically.
+- **`bazel build` crashes on macOS with `DottedVersion ... got 'None'`** — Bazel needs a full Xcode install. Command Line Tools alone make `xcodebuild` unavailable, Bazel's auto-detected `xcode_config` records `"None"` as the SDK version, and any C++ action then crashes. Install Xcode.app and `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`, or use the CMake path instead.
 - **`absolute path inclusion(s) found in rule '@@abseil-cpp+//...'` after installing Xcode** — Bazel is still using the CLT-era `@local_config_cc` / `@local_config_xcode` caches. Run `bazel clean --expunge` once after the Xcode switch.
 - **`fatal error: 'hiredis.h' / 'bsoncxx/...' file not found` under Bazel** — the Bazel build links against Homebrew-installed system libraries. Verify `brew list hiredis librdkafka mongo-cxx-driver mysql-connector-c++` lists the ones your examples need.

@@ -14,22 +14,20 @@ git_override(
     remote = "https://github.com/pinpoint-apm/pinpoint-cpp-agent.git",
     commit = "55a517a1f5c3548b29a5eee3105f8aeef0cda02c",  # v2.0.0
     init_submodules = True,
-    # Bazel 8 dropped cc_proto_library from @rules_cc; the new home is
-    # @com_google_protobuf//bazel. pinpoint's 3rd_party/BUILD still uses the
-    # old import, so rewrite it on the fly.
-    patch_cmds = [
-        "sed -i.bak 's|@rules_cc//cc:defs.bzl|@com_google_protobuf//bazel:cc_proto_library.bzl|' 3rd_party/BUILD && rm -f 3rd_party/BUILD.bak",
-    ],
 )
 
 # gRPC + protobuf are pulled in transitively by pinpoint-cpp; declaring them
 # here makes the same versions available to our gRPC example as well, so
 # pinpoint and the example share one set of gRPC libraries (no ODR clash).
+#
+# These do NOT match the agent's own pins (grpc 1.63.1, protobuf 29.2), and
+# can't: the agent's 3rd_party protos use strip_import_prefix, and every gRPC
+# up to 1.71.2 fails to resolve the resulting _virtual_imports paths when the
+# agent is consumed as an external module ("Could not make proto path relative:
+# external/pinpoint-cpp~/3rd_party/_virtual_imports/..."). 1.74.1 is the first
+# version that works here, and it in turn floors protobuf at 31.1.
 bazel_dep(name = "grpc",     version = "1.74.1", repo_name = "com_github_grpc_grpc")
-bazel_dep(name = "protobuf", version = "29.2",   repo_name = "com_google_protobuf")
-
-# cpptrace is on BCR.
-bazel_dep(name = "cpptrace", version = "1.0.4")
+bazel_dep(name = "protobuf", version = "31.1",   repo_name = "com_google_protobuf")
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 new_local_repository = use_repo_rule(

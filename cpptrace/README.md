@@ -4,7 +4,7 @@ A cpp-httplib server that attaches a cpptrace-captured call stack to a Pinpoint 
 
 **Requires:** nothing beyond the toolchain — cpptrace and cpp-httplib are fetched at build time.
 
-**Bazel does not build this example on macOS:** cpptrace BCR 1.0.4 forces libunwind, which doesn't compile there, so the target is excluded via `target_compatible_with`. Use the CMake build.
+**CMake only — there is no Bazel target.** The sole cpptrace module on the BCR (1.0.4) declares `bazel_compatibility = [">=8.0.0"]`, and this repo pins Bazel 7.7.1 to match the agent. It also pulls libunwind 1.8.1, whose sources include the Linux-only `<elf.h>` and so never compiled on macOS anyway.
 
 Run these from the repository root. See the [top-level README](../README.md) for the shared requirements, build systems, and troubleshooting.
 
@@ -13,7 +13,7 @@ Run these from the repository root. See the [top-level README](../README.md) for
 ```bash
 ./cpptrace/run.sh             # build + smoke test (stack stays up; `down` stops it)
 
-# Manual CMake (Bazel disabled on macOS — libunwind incompatibility)
+# Manual CMake (the only build path for this example)
 cmake -B build/debug -DBUILD_CPPTRACE_EXAMPLE=ON
 cmake --build build/debug --target cpptrace_example
 ./build/debug/bin/cpptrace_example
