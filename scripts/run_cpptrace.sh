@@ -22,6 +22,9 @@ curl_test "GET /users/123" "http://localhost:8088/users/123?name=foo"
 log "test: GET /outgoing (expected to surface a traced failure)"
 curl -sS --max-time 10 -o /dev/null -w "  http=%{http_code}\n" \
     "http://localhost:8088/outgoing?host=localhost:9000&path=/bar" || true
+# The failed call must be *traced*, not fatal — the server has to survive it.
+kill -0 "$(cat "$PIDFILE")" 2>/dev/null \
+    || die "server died handling /outgoing (see $LOGFILE)"
 
 load_test "http://localhost:8088/users/123?name=foo"
 

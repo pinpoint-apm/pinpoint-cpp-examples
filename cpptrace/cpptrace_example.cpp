@@ -202,16 +202,20 @@ void handle_outgoing(const httplib::Request& req, httplib::Response& res) {
         cli.set_read_timeout(5, 0);        // 5 seconds
         external_res = cli.Get(path, headers);
 
-        // Create a reader adapter for your HTTP client response headers
-        HttpHeaderReader response_reader(external_res->headers);
-        pinpoint::helper::TraceHttpClientResponse(outgoing_span_event.value(), external_res->status, response_reader);
+        // A failed call carries no Response at all, so there is nothing to
+        // trace here; the error is recorded on the span further down.
+        if (external_res) {
+            // Create a reader adapter for your HTTP client response headers
+            HttpHeaderReader response_reader(external_res->headers);
+            pinpoint::helper::TraceHttpClientResponse(outgoing_span_event.value(), external_res->status, response_reader);
+        }
     }
 
     std::stringstream json_response;
     json_response << "{\n";
     json_response << "  \"target_url\": \"" << target_url << "\",\n";
-    json_response << "  \"status_code\": " << external_res->status << ",\n";
-    json_response << "  \"response_body\": \"" << external_res->body << "\"\n";
+    json_response << "  \"status_code\": " << (external_res ? external_res->status : 0) << ",\n";
+    json_response << "  \"response_body\": \"" << (external_res ? external_res->body : std::string{}) << "\"\n";
     json_response << "}";
     
     auto error = external_res.error();
