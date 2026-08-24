@@ -41,7 +41,6 @@ class HelloServiceImpl final : public grpcdemo::Hello::Service {
 
     auto span = GetCurrentSpan();
     pinpoint::helper::ScopedSpanEvent scoped(span, "HelloServiceImpl::UnaryCallUnaryReturn");
-    scoped->SetAnnotation(pinpoint::ANNOTATION_API, "UnaryCallUnaryReturn");
 
     response->set_msg("Unary response: " + request->msg());
     return grpc::Status::OK;
@@ -54,7 +53,6 @@ class HelloServiceImpl final : public grpcdemo::Hello::Service {
 
     auto span = GetCurrentSpan();
     pinpoint::helper::ScopedSpanEvent scoped(span, "HelloServiceImpl::UnaryCallStreamReturn");
-    scoped->SetAnnotation(pinpoint::ANNOTATION_API, "UnaryCallStreamReturn");
 
     for (int i = 0; i < 3; ++i) {
       grpcdemo::Greeting resp;
@@ -71,7 +69,6 @@ class HelloServiceImpl final : public grpcdemo::Hello::Service {
 
     auto span = GetCurrentSpan();
     pinpoint::helper::ScopedSpanEvent scoped(span, "HelloServiceImpl::StreamCallUnaryReturn");
-    scoped->SetAnnotation(pinpoint::ANNOTATION_API, "StreamCallUnaryReturn");
 
     std::string combined;
     grpcdemo::Greeting msg;
@@ -89,7 +86,6 @@ class HelloServiceImpl final : public grpcdemo::Hello::Service {
 
     auto span = GetCurrentSpan();
     pinpoint::helper::ScopedSpanEvent scoped(span, "HelloServiceImpl::StreamCallStreamReturn");
-    scoped->SetAnnotation(pinpoint::ANNOTATION_API, "StreamCallStreamReturn");
 
     grpcdemo::Greeting request;
     while (stream->Read(&request)) {

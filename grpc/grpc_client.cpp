@@ -43,7 +43,7 @@ std::unique_ptr<grpcdemo::Hello::Stub> CreateStubWithInterceptor(
   std::vector<std::unique_ptr<grpc::experimental::ClientInterceptorFactoryInterface>>
       interceptor_creators;
   interceptor_creators.push_back(
-      std::make_unique<PinpointClientInterceptorFactory>());
+      std::make_unique<PinpointClientInterceptorFactory>(target));
 
   auto channel = grpc::experimental::CreateCustomChannelWithInterceptors(
       target, grpc::InsecureChannelCredentials(), args,
@@ -66,7 +66,7 @@ bool CallUnary(grpcdemo::Hello::Stub* stub, pinpoint::SpanPtr span) {
     span->SetError(status.error_message());
     return false;
   }
-  span->SetAnnotation(pinpoint::ANNOTATION_API, response.msg());
+  std::cout << "Unary response: " << response.msg() << std::endl;
   return true;
 }
 
