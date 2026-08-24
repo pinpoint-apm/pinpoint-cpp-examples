@@ -241,7 +241,7 @@ curl 'http://localhost:8091/run_request?url=https://httpbin.org/get'
 
 ## grpc — gRPC client/server with interceptors
 
-Custom `ClientInterceptor` / `ServerInterceptor` inject and extract the Pinpoint trace context through gRPC metadata. All four RPC patterns (Unary, Server-Streaming, Client-Streaming, Bidi) are traced. App names: `grpc-server-demo`, `grpc-client-demo`.
+Custom `ClientInterceptor` / `ServerInterceptor` inject and extract the Pinpoint trace context through gRPC metadata. All four RPC patterns (Unary, Server-Streaming, Client-Streaming, Bidi) are traced. App names: `cpp-grpc-server-demo`, `cpp-grpc-client-demo`.
 
 **Build & run:**
 
@@ -354,7 +354,7 @@ curl http://localhost:8092/run_demo
 
 ## mysql — MySQL Connector/C++ X DevAPI + cpp-httplib
 
-Uses X Protocol (`mysqlx://`, port 33060) for SQL execution; each query is wrapped in a span event. Hitting `/db-demo` runs a SELECT/INSERT/UPDATE/DELETE/transaction sequence. App name: `cpp-db-demo`.
+Uses X Protocol (`mysqlx://`, port 33060) for SQL execution; each query is wrapped in a span event. Hitting `/db-demo` runs a SELECT/INSERT/UPDATE/DELETE/transaction sequence. App name: `cpp-mysql-demo`.
 
 **Build & run:**
 

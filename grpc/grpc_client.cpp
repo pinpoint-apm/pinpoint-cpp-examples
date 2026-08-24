@@ -179,7 +179,7 @@ int main(int argc, char** argv) {
     g_grpc_target = env_target;
   }
 
-  setenv("PINPOINT_CPP_APPLICATION_NAME", "grpc-client-demo", 0);
+  setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-grpc-client-demo", 0);
 
   // StartAgent() brings the agent up asynchronously: the collector connection
   // and registration complete on a background thread, so Enable() only turns
