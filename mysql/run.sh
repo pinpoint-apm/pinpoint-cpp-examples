@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # Build and smoke-test the MySQL X DevAPI example.
 #
-#     ./scripts/run_mysql.sh               # default: up + smoke test
-#     ./scripts/run_mysql.sh test          # re-run the requests, stack already up
-#     ./scripts/run_mysql.sh down          # stop it (the mysql container stays up)
-
-SCRIPT_NAME="run_mysql"
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
+#     ./mysql/run.sh               # default: up + smoke test
+#     ./mysql/run.sh test          # re-run the requests, stack already up
+#     ./mysql/run.sh down          # stop it (the mysql container stays up)
 
 DEMO_NAME="mysql"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)/_lib.sh"
+
 PROCS="mysql"
 KILL_PORTS="8089"
 

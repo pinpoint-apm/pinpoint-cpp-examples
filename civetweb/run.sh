@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # Build and smoke-test the civetweb example.
 #
-#     ./scripts/run_civetweb.sh            # default: up + smoke test
-#     ./scripts/run_civetweb.sh test       # re-run the requests, stack already up
-#     ./scripts/run_civetweb.sh down       # stop it
-
-SCRIPT_NAME="run_civetweb"
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
+#     ./civetweb/run.sh            # default: up + smoke test
+#     ./civetweb/run.sh test       # re-run the requests, stack already up
+#     ./civetweb/run.sh down       # stop it
 
 DEMO_NAME="civetweb"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)/_lib.sh"
+
 PROCS="civetweb"
 KILL_PORTS="8080"
 

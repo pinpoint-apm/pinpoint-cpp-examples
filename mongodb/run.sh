@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # Build and smoke-test the mongocxx example (HTTP server mode).
 #
-#     ./scripts/run_mongodb.sh             # default: up + smoke test
-#     ./scripts/run_mongodb.sh test        # re-run the requests, stack already up
-#     ./scripts/run_mongodb.sh down        # stop it (the mongo container stays up)
-
-SCRIPT_NAME="run_mongodb"
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
+#     ./mongodb/run.sh             # default: up + smoke test
+#     ./mongodb/run.sh test        # re-run the requests, stack already up
+#     ./mongodb/run.sh down        # stop it (the mongo container stays up)
 
 DEMO_NAME="mongodb"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)/_lib.sh"
+
 PROCS="mongodb"
 KILL_PORTS="8092"
 

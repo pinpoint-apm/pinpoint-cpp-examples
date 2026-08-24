@@ -5,7 +5,7 @@
 #               --with-cc-opt="-I/path/to/pinpoint-cpp-agent/include" \
 #               --with-ld-opt="-L/path/to/pinpoint-cpp-agent/lib -lpinpoint_cpp"
 #
-# ../scripts/run_nginx.sh does all of the above against a locally built agent.
+# ./run.sh does all of the above against a locally built agent.
 
 ngx_addon_name=ngx_http_pinpoint_module
 

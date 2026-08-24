@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # Build and smoke-test the libcurl example.
 #
-#     ./scripts/run_curl.sh                # default: up + smoke test
-#     ./scripts/run_curl.sh test           # re-run the requests, stack already up
-#     ./scripts/run_curl.sh down           # stop it
-
-SCRIPT_NAME="run_curl"
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
+#     ./curl/run.sh                # default: up + smoke test
+#     ./curl/run.sh test           # re-run the requests, stack already up
+#     ./curl/run.sh down           # stop it
 
 DEMO_NAME="curl"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)/_lib.sh"
+
 PROCS="curl"
 KILL_PORTS="8091"
 

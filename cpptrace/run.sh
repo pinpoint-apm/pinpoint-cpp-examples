@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # Build and smoke-test the cpptrace example.
 #
-#     ./scripts/run_cpptrace.sh            # default: up + smoke test
-#     ./scripts/run_cpptrace.sh test       # re-run the requests, stack already up
-#     ./scripts/run_cpptrace.sh down       # stop it
-
-SCRIPT_NAME="run_cpptrace"
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
+#     ./cpptrace/run.sh            # default: up + smoke test
+#     ./cpptrace/run.sh test       # re-run the requests, stack already up
+#     ./cpptrace/run.sh down       # stop it
 
 DEMO_NAME="cpptrace"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)/_lib.sh"
+
 PROCS="cpptrace"
 KILL_PORTS="8088"
 

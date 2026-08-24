@@ -2,14 +2,13 @@
 # Build and smoke-test the librdkafka producer/consumer example.
 # Brings up a single-broker Kafka container (KRaft mode).
 #
-#     ./scripts/run_kafka.sh               # default: up + smoke test
-#     ./scripts/run_kafka.sh test          # re-run the requests, stack already up
-#     ./scripts/run_kafka.sh down          # stop it (the kafka container stays up)
-
-SCRIPT_NAME="run_kafka"
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
+#     ./kafka/run.sh               # default: up + smoke test
+#     ./kafka/run.sh test          # re-run the requests, stack already up
+#     ./kafka/run.sh down          # stop it (the kafka container stays up)
 
 DEMO_NAME="kafka"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)/_lib.sh"
+
 PROCS="kafka-consumer kafka-producer"
 KILL_PORTS="8090"
 

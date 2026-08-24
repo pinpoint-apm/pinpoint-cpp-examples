@@ -53,7 +53,7 @@ export PINPOINT_CPP_COLLECTOR_HOST=collector.your.network    # or `localhost` fo
 ./build/debug/bin/redis_example
 ```
 
-`scripts/_lib.sh` sets `PINPOINT_CPP_COLLECTOR_HOST=localhost` by default for the `scripts/run_*.sh` helpers — export your own value before invoking them if you have a real collector elsewhere.
+`scripts/_lib.sh` sets `PINPOINT_CPP_COLLECTOR_HOST=localhost` by default for the `<demo>/run.sh` drivers — export your own value before invoking them if you have a real collector elsewhere.
 
 ### Backing services (kafka / mongodb / mysql / redis)
 
@@ -77,26 +77,26 @@ Endpoints:
 
 ### Per-example scripts (recommended)
 
-Each example has a `scripts/run_<name>.sh` that handles configure, build, optional `docker run` for its backing service, and a curl-driven smoke test:
+Each example has a `<demo>/run.sh` that handles configure, build, optional `docker run` for its backing service, and a curl-driven smoke test:
 
 ```bash
-./scripts/run_civetweb.sh
-./scripts/run_cpptrace.sh
-./scripts/run_curl.sh
-./scripts/run_grpc.sh
-./scripts/run_kafka.sh         # also brings up the kafka container
-./scripts/run_mongodb.sh       # also brings up the mongodb container
-./scripts/run_mysql.sh         # also brings up the mysql container
-./scripts/run_nginx.sh         # also fetches and builds the nginx sources
-./scripts/run_redis.sh         # also brings up the redis container
+./civetweb/run.sh
+./cpptrace/run.sh
+./curl/run.sh
+./grpc/run.sh
+./kafka/run.sh         # also brings up the kafka container
+./mongodb/run.sh       # also brings up the mongodb container
+./mysql/run.sh         # also brings up the mysql container
+./nginx/run.sh         # also fetches and builds the nginx sources
+./redis/run.sh         # also brings up the redis container
 ```
 
 Every script takes an `up` (default) / `test` / `down` subcommand, the same way the python agent's `examples/<demo>/run.sh` drivers do:
 
 ```bash
-./scripts/run_redis.sh              # up: build, start, wait for the agent, smoke-test
-./scripts/run_redis.sh test         # re-run the requests against the running stack
-./scripts/run_redis.sh down         # stop the example processes
+./redis/run.sh              # up: build, start, wait for the agent, smoke-test
+./redis/run.sh test         # re-run the requests against the running stack
+./redis/run.sh down         # stop the example processes
 ```
 
 `up` **leaves the stack running** on purpose. The agent's registration handshake with the collector takes about five seconds, and nothing recorded before it lands ever reaches the collector — so `up` waits for `success to register the agent` in the agent log before sending the first request, and then keeps the processes alive so the spans finish streaming and the endpoints stay hittable while you look at them in the Pinpoint UI. Without a reachable collector the wait times out after 60s with a warning and the smoke test runs anyway.
@@ -106,13 +106,13 @@ Each process writes two logs under `$RUN_DIR` (`/tmp/pinpoint-cpp-demo`, overrid
 `down` stops the example processes but leaves the containers running (idempotent re-use on the next run). Stop those with `docker rm -f <name>` when you are done. Override the collector or preset via env:
 
 ```bash
-PINPOINT_CPP_COLLECTOR_HOST=10.0.0.5 PRESET=release ./scripts/run_grpc.sh
+PINPOINT_CPP_COLLECTOR_HOST=10.0.0.5 PRESET=release ./grpc/run.sh
 ```
 
 **Load mode:** pass `--load <seconds>` to keep hitting the example's endpoints for that long after the smoke test — useful for producing a steady stream of traces to watch in the Pinpoint UI. Requests fire with a random 50–500ms gap; failures are counted and reported but don't abort the run. `--load 0` disables it, and Ctrl-C stops the load early (partial counts are reported and the stack stays up, same as any other run):
 
 ```bash
-./scripts/run_redis.sh --load 60
+./redis/run.sh --load 60
 ```
 
 ### CMake
@@ -149,7 +149,7 @@ A CivetWeb HTTP server traced with pinpoint-cpp-agent's **C API** (`pt_*`). Manu
 **Build & run:**
 
 ```bash
-./scripts/run_civetweb.sh             # build + smoke test (stack stays up; `down` stops it)
+./civetweb/run.sh             # build + smoke test (stack stays up; `down` stops it)
 
 # Manual CMake
 cmake -B build/debug -DBUILD_CIVETWEB_EXAMPLE=ON
@@ -183,7 +183,7 @@ A cpp-httplib server that attaches a cpptrace-captured call stack to a Pinpoint 
 **Build & run:**
 
 ```bash
-./scripts/run_cpptrace.sh             # build + smoke test (stack stays up; `down` stops it)
+./cpptrace/run.sh             # build + smoke test (stack stays up; `down` stops it)
 
 # Manual CMake (Bazel disabled on macOS — libunwind incompatibility)
 cmake -B build/debug -DBUILD_CPPTRACE_EXAMPLE=ON
@@ -211,7 +211,7 @@ Issues outbound HTTP requests with libcurl while injecting the Pinpoint trace co
 **Build & run:**
 
 ```bash
-./scripts/run_curl.sh                 # build + smoke test (stack stays up; `down` stops it)
+./curl/run.sh                 # build + smoke test (stack stays up; `down` stops it)
 
 # Manual CMake
 cmake -B build/debug -DBUILD_CURL_EXAMPLE=ON
@@ -246,7 +246,7 @@ Custom `ClientInterceptor` / `ServerInterceptor` inject and extract the Pinpoint
 **Build & run:**
 
 ```bash
-./scripts/run_grpc.sh                 # starts server + client, smoke-tests, leaves both up
+./grpc/run.sh                 # starts server + client, smoke-tests, leaves both up
 
 # Manual CMake
 cmake -B build/debug -DBUILD_GRPC_EXAMPLE=ON
@@ -284,13 +284,13 @@ The producer publishes a message with the trace context injected into Kafka mess
 **Build & run:**
 
 ```bash
-./scripts/run_kafka.sh                # brings up kafka, runs both binaries, verifies the message
+./kafka/run.sh                # brings up kafka, runs both binaries, verifies the message
 
 # Manual
 docker run -d --name pinpoint-cpp-examples-kafka -p 9092:9092 \
     -e KAFKA_NODE_ID=1 -e KAFKA_PROCESS_ROLES=broker,controller \
     -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 \
-    apache/kafka:3.8.0                # see scripts/run_kafka.sh for the full flag set
+    apache/kafka:3.8.0                # see kafka/run.sh for the full flag set
 
 cmake -B build/debug -DBUILD_KAFKA_EXAMPLE=ON
 cmake --build build/debug --target kafka_web_producer kafka_consumer
@@ -326,7 +326,7 @@ Each MongoDB operation is wrapped in a SpanEvent that records the collection nam
 **Build & run:**
 
 ```bash
-./scripts/run_mongodb.sh              # brings up mongo, runs the example + smoke test
+./mongodb/run.sh              # brings up mongo, runs the example + smoke test
 
 # Manual
 docker run -d --name pinpoint-cpp-examples-mongodb -p 27017:27017 mongo:7
@@ -359,13 +359,13 @@ Uses X Protocol (`mysqlx://`, port 33060) for SQL execution; each query is wrapp
 **Build & run:**
 
 ```bash
-./scripts/run_mysql.sh                # brings up mysql, runs the example + smoke test
+./mysql/run.sh                # brings up mysql, runs the example + smoke test
 
 # Manual
 docker run -d --name pinpoint-cpp-examples-mysql -p 3306:3306 -p 33060:33060 \
     -e MYSQL_ROOT_PASSWORD=pinpoint123 -e MYSQL_DATABASE=test \
     -v "$PWD/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro" \
-    mysql:8.0                         # see scripts/run_mysql.sh for the full flag set
+    mysql:8.0                         # see mysql/run.sh for the full flag set
 
 cmake -B build/debug -DBUILD_MYSQL_EXAMPLE=ON
 cmake --build build/debug --target mysql_example
@@ -401,7 +401,7 @@ With `worker_processes 2` you get two agent instances in the Pinpoint UI, each w
 **Build & run:**
 
 ```bash
-./scripts/run_nginx.sh                # fetch nginx, build module + nginx, smoke test
+./nginx/run.sh                # fetch nginx, build module + nginx, smoke test
 ```
 
 The script builds the agent library through the normal CMake configure, then hands nginx's `configure` the module directory. There is no CMake or Bazel target — nginx modules are built by nginx. Everything lands under `build/debug/nginx/` (sources, prefix, `build.log`) and is reused on the next run; the module is relinked whenever `ngx_http_pinpoint_module.c` changes. Override the version or port with `NGINX_VERSION` / `NGINX_PORT`.
@@ -451,7 +451,7 @@ Each Redis command is wrapped in a SpanEvent with `SERVICE_TYPE_REDIS`. App name
 **Build & run:**
 
 ```bash
-./scripts/run_redis.sh                # brings up redis, runs the example + smoke test
+./redis/run.sh                # brings up redis, runs the example + smoke test
 
 # Manual
 docker run -d --name pinpoint-cpp-examples-redis -p 6379:6379 redis:7
@@ -487,4 +487,4 @@ curl http://localhost:8093/run_demo
 - **`cpptrace_example` won't build under Bazel on macOS** — cpptrace BCR 1.0.4 forces libunwind, which doesn't compile on macOS. Use the CMake build for this example.
 - **MongoDB / MySQL / Kafka connection refused** — verify the container is running (`docker ps` should show `pinpoint-cpp-examples-<service>`).
 - **Pinpoint traces don't show up in the collector** — confirm the collector is reachable from this host and that `PINPOINT_CPP_COLLECTOR_HOST` points to it. `StartAgent()` brings the agent up asynchronously, and `Enable()` only returns true once the collector has accepted the agent's registration; an unreachable collector leaves the agent disabled (it keeps retrying in the background) and spans are dropped rather than delivered. Grep the run script's agent log for the handshake: `grep 'success to register the agent' /tmp/pinpoint-cpp-demo/<name>.agent.log`.
-- **`cmake --build build/debug` produces no example binaries** — all `BUILD_*_EXAMPLE` options default to OFF. Use `./scripts/run_<name>.sh` or `cmake -B build/debug -DBUILD_<NAME>_EXAMPLE=ON` first.
+- **`cmake --build build/debug` produces no example binaries** — all `BUILD_*_EXAMPLE` options default to OFF. Use `./<demo>/run.sh` or `cmake -B build/debug -DBUILD_<NAME>_EXAMPLE=ON` first.

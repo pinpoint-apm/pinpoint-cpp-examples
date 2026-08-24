@@ -1,13 +1,12 @@
 # shellcheck shell=bash
 # Shared plumbing for the per-example demo drivers. Source this from each
-# run_*.sh script; do not execute directly.
+# <demo>/run.sh driver; do not execute directly.
 #
-# Contract for a run_*.sh script (mirrors the python agent's
+# Contract for a <demo>/run.sh driver (mirrors the python agent's
 # examples/<demo>/run.sh drivers):
 #
-#     SCRIPT_NAME="run_redis"
-#     source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
-#     DEMO_NAME="redis"       # shown in the log lines
+#     DEMO_NAME="redis"       # set first: the lib logs with it
+#     source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)/_lib.sh"
 #     PROCS="redis"           # log/pid basenames under $RUN_DIR, one per process
 #     KILL_PORTS="8093"       # listener ports down() force-kills
 #     up() {
@@ -31,7 +30,7 @@
 #
 # up() deliberately leaves the stack running. The spans it just produced are
 # streamed to the collector by a background thread, and the endpoints stay
-# hittable while you look at the Pinpoint UI; stop it with `run_<name>.sh down`.
+# hittable while you look at the Pinpoint UI; stop it with `<demo>/run.sh down`.
 
 set -euo pipefail
 
@@ -42,26 +41,26 @@ BUILD_DIR="$REPO_ROOT/build/$PRESET"
 BIN_DIR="$BUILD_DIR/bin"
 RUN_DIR="${PINPOINT_DEMO_RUN_DIR:-/tmp/pinpoint-cpp-demo}"
 
-: "${SCRIPT_NAME:=$(basename "${BASH_SOURCE[1]:-script}")}"
+: "${DEMO_NAME:?DEMO_NAME must be set before sourcing _lib.sh}"
 
 mkdir -p "$RUN_DIR"
 
 log() {
-    printf '\033[1;34m[%s]\033[0m %s\n' "$SCRIPT_NAME" "$*"
+    printf '\033[1;34m[%s]\033[0m %s\n' "$DEMO_NAME" "$*"
 }
 
 warn() {
-    printf '\033[1;33m[%s] WARN\033[0m %s\n' "$SCRIPT_NAME" "$*" >&2
+    printf '\033[1;33m[%s] WARN\033[0m %s\n' "$DEMO_NAME" "$*" >&2
 }
 
 die() {
-    printf '\033[1;31m[%s] ERROR\033[0m %s\n' "$SCRIPT_NAME" "$*" >&2
+    printf '\033[1;31m[%s] ERROR\033[0m %s\n' "$DEMO_NAME" "$*" >&2
     exit 1
 }
 
 # ---------------------------------------------------------------------------
-# Options — sourcing this file leaves "$@" as the run script's arguments,
-# so they are parsed here once for every run_*.sh uniformly.
+# Options — sourcing this file leaves "$@" as the driver's arguments, so
+# they are parsed here once for every <demo>/run.sh uniformly.
 #   up | test | down   what to do (default: up)
 #   --load <seconds>   after the smoke test, keep issuing requests for that
 #                      long at random 50-500ms intervals (see load_test
@@ -82,7 +81,7 @@ for __opt in "$@"; do
     case "$__opt" in
         up|test|down) DEMO_CMD="$__opt" ;;
         --load) __expect_duration=1 ;;
-        *) die "unknown option '$__opt' (usage: $SCRIPT_NAME [up|test|down] [--load <seconds>])" ;;
+        *) die "unknown option '$__opt' (usage: $0 [up|test|down] [--load <seconds>])" ;;
     esac
 done
 [ "$__expect_duration" -eq 0 ] || die "--load requires a duration in seconds"
@@ -105,7 +104,7 @@ ensure_configure() {
     local opt
     for opt in "$@"; do args+=("-D${opt}=ON"); done
     # ${args[@]+...}: bash 3.2 (macOS) treats an empty array as unset under
-    # `set -u`, and run_nginx.sh configures with no example toggle at all.
+    # `set -u`, and nginx/run.sh configures with no example toggle at all.
     if [ ! -f "$BUILD_DIR/CMakeCache.txt" ]; then
         log "configuring (--preset $PRESET) ${args[*]:-}"
         ( cd "$REPO_ROOT" && cmake --preset "$PRESET" ${args[@]+"${args[@]}"} )
@@ -139,7 +138,7 @@ ensure_container() {
 
 agent_log_path() {
     # agent_log_path <name> — where the agent inside process <name> logs.
-    # run_nginx.sh needs the same path for its generated YAML, so the naming
+    # nginx/run.sh needs the same path for its generated YAML, so the naming
     # convention lives here rather than in start_demo alone.
     printf '%s/%s.agent.log\n' "$RUN_DIR" "$1"
 }

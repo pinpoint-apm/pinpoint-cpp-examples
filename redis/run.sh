@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # Build and smoke-test the hiredis example (HTTP server mode).
 #
-#     ./scripts/run_redis.sh               # default: up + smoke test
-#     ./scripts/run_redis.sh test          # re-run the requests, stack already up
-#     ./scripts/run_redis.sh down          # stop it (the redis container stays up)
-
-SCRIPT_NAME="run_redis"
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
+#     ./redis/run.sh               # default: up + smoke test
+#     ./redis/run.sh test          # re-run the requests, stack already up
+#     ./redis/run.sh down          # stop it (the redis container stays up)
 
 DEMO_NAME="redis"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)/_lib.sh"
+
 PROCS="redis"
 KILL_PORTS="8093"
 

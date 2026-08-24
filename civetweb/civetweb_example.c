@@ -252,7 +252,7 @@ int main(int argc, char* argv[]) {
 
     printf("Server started on port 8080\n");
     printf("Press Enter to stop the server...\n");
-    /* EOF means stdin is not a terminal (scripts/run_civetweb.sh feeds
+    /* EOF means stdin is not a terminal (civetweb/run.sh feeds
        /dev/null); wait to be signalled instead of stopping right away. */
     while (getchar() == EOF) {
         pause();

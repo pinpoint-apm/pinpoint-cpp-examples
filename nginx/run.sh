@@ -1,19 +1,18 @@
 #!/usr/bin/env bash
 # Build and smoke-test the nginx dynamic module example.
 #
-#     ./scripts/run_nginx.sh               # default: up + smoke test
-#     ./scripts/run_nginx.sh test          # re-run the requests, stack already up
-#     ./scripts/run_nginx.sh down          # stop it
+#     ./nginx/run.sh               # default: up + smoke test
+#     ./nginx/run.sh test          # re-run the requests, stack already up
+#     ./nginx/run.sh down          # stop it
 #
 # Unlike the other examples this one is not a CMake/Bazel target: an nginx
 # module builds with nginx's own build system. This script fetches the nginx
 # sources, builds them together with the module against the agent library from
 # the CMake build tree, then runs that nginx and traces a few requests.
 
-SCRIPT_NAME="run_nginx"
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
-
 DEMO_NAME="nginx"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)/_lib.sh"
+
 PROCS="nginx"
 
 NGINX_VERSION="${NGINX_VERSION:-1.28.0}"

@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # Build and smoke-test the gRPC client/server example.
 #
-#     ./scripts/run_grpc.sh                # default: up + smoke test
-#     ./scripts/run_grpc.sh test           # re-run the requests, stack already up
-#     ./scripts/run_grpc.sh down           # stop it
-
-SCRIPT_NAME="run_grpc"
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
+#     ./grpc/run.sh                # default: up + smoke test
+#     ./grpc/run.sh test           # re-run the requests, stack already up
+#     ./grpc/run.sh down           # stop it
 
 DEMO_NAME="grpc"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)/_lib.sh"
+
 PROCS="grpc-server grpc-client"
 KILL_PORTS="50051 8094"
 
