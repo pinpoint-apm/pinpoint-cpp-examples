@@ -74,6 +74,7 @@ up() {
     cat >"$NGINX_PREFIX/conf/pinpoint.yaml" <<EOF
 ApplicationName: "cpp-nginx-demo"
 AgentName: "cpp-nginx-demo"
+UidVersion: v3
 Collector:
   Host: "$PINPOINT_CPP_COLLECTOR_HOST"
 Log:

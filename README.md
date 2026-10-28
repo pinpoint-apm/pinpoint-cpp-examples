@@ -38,7 +38,7 @@ Per-example documentation — requirements, endpoints, build/run commands, env o
 
 ## Pinpoint Collector
 
-Each example sets its own `ApplicationName` in source via `setenv(...)`. The collector host is read from the `PINPOINT_CPP_COLLECTOR_HOST` env var (ports default to `9991`/`9992`/`9993`). The examples still run if no collector is reachable — the trace exports just fail silently — but the agent does require a host to resolve at startup, so set the env var before launching the binary:
+Each example sets its own `ApplicationName` in source via `setenv(...)`, along with `UidVersion: v3` (`PINPOINT_CPP_UID_VERSION=v3`): since v2.2.0 the agent defaults to `v4`, which refuses to start without a `ServiceName`. Export `PINPOINT_CPP_UID_VERSION=v4` and `PINPOINT_CPP_SERVICE_NAME` to register under a service instead. The collector host is read from the `PINPOINT_CPP_COLLECTOR_HOST` env var (ports default to `9991`/`9992`/`9993`). The examples still run if no collector is reachable — the trace exports just fail silently — but the agent does require a host to resolve at startup, so set the env var before launching the binary:
 
 ```bash
 export PINPOINT_CPP_COLLECTOR_HOST=collector.your.network    # or `localhost` for a local collector

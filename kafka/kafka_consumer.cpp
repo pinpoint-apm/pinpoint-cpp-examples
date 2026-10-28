@@ -39,6 +39,7 @@ int main(int argc, char **argv) {
     
     // Pinpoint Agent Init
     setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-kafka-consumer-demo", 0);
+    setenv("PINPOINT_CPP_UID_VERSION", "v3", 0);
     if (!pinpoint::StartAgent()) {
         std::cerr << "failed to start the pinpoint agent: check the agent log" << std::endl;
     }

@@ -28,7 +28,7 @@ include(FetchContent)
 find_package(PkgConfig QUIET)
 
 # ---------------------------------------------------------------------------
-# pinpoint-cpp-agent v2.0.0 (built shared-only with tests/examples disabled
+# pinpoint-cpp-agent v2.2.0 (built shared-only with tests/examples disabled
 # to keep the configure step lean)
 # ---------------------------------------------------------------------------
 set(BUILD_TESTING     OFF CACHE BOOL "" FORCE)
@@ -44,7 +44,7 @@ set(YAML_CPP_FORMAT_SOURCE OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     pinpoint_cpp
     GIT_REPOSITORY https://github.com/pinpoint-apm/pinpoint-cpp-agent.git
-    GIT_TAG v2.0.0
+    GIT_TAG v2.2.0
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(pinpoint_cpp)

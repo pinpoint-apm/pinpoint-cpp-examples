@@ -8,11 +8,11 @@ bazel_dep(name = "platforms",        version = "0.0.10")
 # pinpoint-cpp-agent has a complete bzlmod build of its own. It isn't on BCR,
 # so we pull it directly from GitHub. The grpc-idl is a git submodule, so
 # init_submodules=True is required.
-bazel_dep(name = "pinpoint-cpp", version = "2.0.0")
+bazel_dep(name = "pinpoint-cpp", version = "2.2.0")
 git_override(
     module_name = "pinpoint-cpp",
     remote = "https://github.com/pinpoint-apm/pinpoint-cpp-agent.git",
-    commit = "55a517a1f5c3548b29a5eee3105f8aeef0cda02c",  # v2.0.0
+    commit = "496fe259607ed395022a365ec4ead3f785e322b6",  # v2.2.0
     init_submodules = True,
 )
 

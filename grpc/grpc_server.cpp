@@ -104,6 +104,7 @@ int main(int argc, char** argv) {
   (void)argv;
 
   setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-grpc-server-demo", 0);
+  setenv("PINPOINT_CPP_UID_VERSION", "v3", 0);
   setenv("PINPOINT_CPP_HTTP_COLLECT_URL_STAT", "false", 0);
 
   // StartAgent() brings the agent up asynchronously: the collector connection

@@ -231,6 +231,7 @@ int main(int argc, char* argv[]) {
     printf("=================================\n\n");
 
     setenv("PINPOINT_CPP_APPLICATION_NAME", "cpp-civetweb-demo", 0);
+    setenv("PINPOINT_CPP_UID_VERSION", "v3", 0);
 
     if (!pt_start_agent(NULL)) {
         fprintf(stderr, "Warning: Failed to start the Pinpoint agent (check the "
